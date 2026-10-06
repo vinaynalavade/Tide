@@ -10,3 +10,10 @@ app/build/
 .externalNativeBuild
 .cxx
 local.properties
+
+# Signing & Keystores
+*.jks
+*.keystore
+keystore/
+keystore.properties
+signing.properties
