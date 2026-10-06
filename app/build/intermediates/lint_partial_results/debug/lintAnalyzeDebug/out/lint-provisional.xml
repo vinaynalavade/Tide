@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.7.3" type="conditional_incidents">
+
+    <incident
+        id="NotificationPermission"
+        severity="error"
+        message="When targeting Android 13 or higher, posting a permission requires holding the `POST_NOTIFICATIONS` permission">
+        <fix-data missing="android.permission.POST_NOTIFICATIONS"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/tide/app/core/notification/TideNotificationManager.kt"
+            line="78"
+            column="13"
+            startOffset="2812"
+            endLine="78"
+            endColumn="99"
+            endOffset="2898"/>
+    </incident>
+
+    <incident
+        id="NotificationPermission"
+        severity="error"
+        message="When targeting Android 13 or higher, posting a permission requires holding the `POST_NOTIFICATIONS` permission">
+        <fix-data missing="android.permission.POST_NOTIFICATIONS"/>
+        <location
+            file="${:app*debug*MAIN*sourceProvider*0*javaDir*0}/com/tide/app/core/notification/TideNotificationManager.kt"
+            line="103"
+            column="13"
+            startOffset="3792"
+            endLine="103"
+            endColumn="100"
+            endOffset="3879"/>
+    </incident>
+
+</incidents>

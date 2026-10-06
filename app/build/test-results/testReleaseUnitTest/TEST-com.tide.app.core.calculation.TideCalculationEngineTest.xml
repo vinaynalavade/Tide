@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.tide.app.core.calculation.TideCalculationEngineTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-06T10:47:40" hostname="VINAY" time="0.061">
+  <properties/>
+  <testcase name="testInsights_SufficientDataRule" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.028"/>
+  <testcase name="testAvoidedConsumption_ReduceMode" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.002"/>
+  <testcase name="testCravingAnalysis" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.018"/>
+  <testcase name="testAvoidedConsumption_QuitMode" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.0"/>
+  <testcase name="testReduceMode_TargetExceededIsNotClean" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.001"/>
+  <testcase name="testStreaks_MultipleSlips" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.001"/>
+  <testcase name="testStreaks_SlipResetsCurrentStreak_PreservesLongestStreakAndCleanDays" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.0"/>
+  <testcase name="testInsights_InsufficientDataRule" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.006"/>
+  <testcase name="testReduceMode_TargetMetIsClean" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.0"/>
+  <testcase name="testMoneySaved_ReducedConsumption" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.0"/>
+  <testcase name="testTriggerPercentages" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.004"/>
+  <testcase name="testMoneySaved_CleanDays_QuitMode" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.0"/>
+  <testcase name="testStreaks_ConsecutiveCleanDays" classname="com.tide.app.core.calculation.TideCalculationEngineTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
