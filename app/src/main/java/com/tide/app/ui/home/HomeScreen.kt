@@ -17,10 +17,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.LocalAtm
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Shield
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Warning
+import kotlin.math.max
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -98,9 +102,10 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 24.dp, bottom = 100.dp)
+            .padding(top = 16.dp, bottom = 100.dp)
     ) {
         // Editorial Greeting
         Text(
@@ -135,51 +140,151 @@ fun HomeScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2x2 Key Metric Cards
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            MetricCard(
-                title = "Money Saved",
-                value = "₹${state.money.lifetimeSaved.toInt()}",
-                subtitle = "₹${state.money.todaySaved.toInt()} today",
-                icon = Icons.Default.LocalAtm,
-                accentColor = TideSuccess,
-                modifier = Modifier.weight(1f)
-            )
-            MetricCard(
-                title = "Avoided",
-                value = "${state.avoided.lifetimeAvoided.toInt()}",
-                subtitle = "${state.avoided.todayAvoided.toInt()} today (${addiction.unit})",
-                icon = Icons.Default.Shield,
-                accentColor = TidePrimaryLuminous,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        // 2x2 Key Metric Cards - Goal-Adaptive
+        when (addiction.goalType.uppercase()) {
+            "QUIT" -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Money Saved",
+                        value = "₹${state.money.lifetimeSaved.toInt()}",
+                        subtitle = "₹${state.money.todaySaved.toInt()} today",
+                        icon = Icons.Default.LocalAtm,
+                        accentColor = TideSuccess,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Avoided",
+                        value = "${state.avoided.lifetimeAvoided.toInt()}",
+                        subtitle = "${state.avoided.todayAvoided.toInt()} today (${addiction.unit})",
+                        icon = Icons.Default.Shield,
+                        accentColor = TidePrimaryLuminous,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-        Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            MetricCard(
-                title = "Current Streak",
-                value = "${state.streak.currentStreak} d",
-                subtitle = "Best: ${state.streak.longestStreak} days",
-                icon = Icons.AutoMirrored.Filled.TrendingUp,
-                accentColor = TidePrimaryLuminous,
-                modifier = Modifier.weight(1f)
-            )
-            MetricCard(
-                title = "Clean Days",
-                value = "${state.streak.totalCleanDays}",
-                subtitle = "${state.streak.successRate}% rate",
-                icon = Icons.Default.Spa,
-                accentColor = TideTheme.colors.warning,
-                modifier = Modifier.weight(1f)
-            )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Current Streak",
+                        value = "${state.streak.currentStreak} d",
+                        subtitle = "Best: ${state.streak.longestStreak} days",
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        accentColor = TidePrimaryLuminous,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Clean Days",
+                        value = "${state.streak.totalCleanDays}",
+                        subtitle = "${state.streak.successRate}% rate",
+                        icon = Icons.Default.Spa,
+                        accentColor = TideTheme.colors.warning,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            "REDUCE" -> {
+                val target = state.goal?.targetAmount ?: 0.0
+                val remainingAllowance = max(0.0, target - state.todayConsumptionCount)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Money Saved",
+                        value = "₹${state.money.lifetimeSaved.toInt()}",
+                        subtitle = "₹${state.money.todaySaved.toInt()} today",
+                        icon = Icons.Default.LocalAtm,
+                        accentColor = TideSuccess,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Allowance Left",
+                        value = "${remainingAllowance.toInt()} ${addiction.unit}",
+                        subtitle = "Target: ${target.toInt()} / day",
+                        icon = Icons.Default.Shield,
+                        accentColor = if (remainingAllowance > 0) TidePrimaryLuminous else TideSlip,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Target Streak",
+                        value = "${state.streak.currentStreak} d",
+                        subtitle = "Best: ${state.streak.longestStreak} d on target",
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        accentColor = TidePrimaryLuminous,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Days on Target",
+                        value = "${state.streak.totalCleanDays}",
+                        subtitle = "${state.streak.successRate}% within target",
+                        icon = Icons.Default.DoneAll,
+                        accentColor = TideTheme.colors.warning,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            else -> { // "TRACK"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Money Spent",
+                        value = "₹${state.money.lifetimeSpent.toInt()}",
+                        subtitle = "₹${state.money.todaySpent.toInt()} today",
+                        icon = Icons.Default.LocalAtm,
+                        accentColor = TidePrimaryLuminous,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Logged Today",
+                        value = "${state.todayConsumptionCount.toInt()} ${addiction.unit}",
+                        subtitle = "Baseline: ${addiction.baselineAmount.toInt()} ${addiction.unit}",
+                        icon = Icons.Default.Equalizer,
+                        accentColor = TidePrimaryLuminous,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Days Tracked",
+                        value = "${state.streak.totalElapsedDays} d",
+                        subtitle = "Active observation",
+                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                        accentColor = TidePrimaryLuminous,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Today's Logs",
+                        value = "${state.todayEvents.size}",
+                        subtitle = if (state.todayCheckIn != null) "Checked in today" else "No check-in yet",
+                        icon = Icons.Default.Spa,
+                        accentColor = TideTheme.colors.warning,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -221,7 +326,11 @@ fun HomeScreen(
                             color = TideTheme.colors.textPrimary
                         )
                         Text(
-                            text = "No consumption or slips recorded today.",
+                            text = when (addiction.goalType.uppercase()) {
+                                "QUIT" -> "No consumption or slips recorded today."
+                                "REDUCE" -> "Within target. No logs recorded yet today."
+                                else -> "No activity recorded yet today. Tap + to log."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = TideTheme.colors.textSecondary
                         )

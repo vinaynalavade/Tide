@@ -20,6 +20,13 @@ interface TideRepository {
     suspend fun saveAddiction(addiction: AddictionEntity): Long
     suspend fun updateAddiction(addiction: AddictionEntity)
 
+    suspend fun completeOnboardingTransaction(
+        addiction: AddictionEntity,
+        product: ProductEntity,
+        goal: GoalEntity,
+        defaultTriggers: List<String>
+    ): Long
+
     fun getProductForAddiction(addictionId: Long): Flow<ProductEntity?>
     suspend fun getProductForAddictionSync(addictionId: Long): ProductEntity?
     suspend fun saveProduct(product: ProductEntity): Long

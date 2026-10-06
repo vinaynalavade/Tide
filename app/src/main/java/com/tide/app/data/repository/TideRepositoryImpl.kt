@@ -1,5 +1,6 @@
 package com.tide.app.data.repository
 
+import androidx.room.withTransaction
 import com.tide.app.data.local.TideDatabase
 import com.tide.app.data.local.entity.AddictionEntity
 import com.tide.app.data.local.entity.ConsumptionEntryEntity
@@ -37,6 +38,47 @@ class TideRepositoryImpl(
 
     override suspend fun updateAddiction(addiction: AddictionEntity) = withContext(Dispatchers.IO) {
         database.addictionDao().updateAddiction(addiction)
+    }
+
+    override suspend fun completeOnboardingTransaction(
+        addiction: AddictionEntity,
+        product: ProductEntity,
+        goal: GoalEntity,
+        defaultTriggers: List<String>
+    ): Long = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val addictionId = database.addictionDao().insertAddiction(addiction)
+            database.productDao().insertProduct(product.copy(addictionId = addictionId))
+            database.goalDao().insert(goal.copy(addictionId = addictionId))
+
+            for (triggerName in defaultTriggers) {
+                database.triggerDao().insert(TriggerEntity(name = triggerName, category = "Default"))
+            }
+
+            database.notificationPreferenceDao().insertAll(
+                listOf(
+                    NotificationPreferenceEntity(
+                        type = "DAILY_CHECKIN",
+                        time = "20:00",
+                        enabled = true
+                    ),
+                    NotificationPreferenceEntity(
+                        type = "MILESTONES",
+                        time = "09:00",
+                        enabled = true
+                    )
+                )
+            )
+
+            database.userSettingsDao().insertOrUpdate(
+                UserSettingsEntity(
+                    id = 1,
+                    onboardingCompleted = true
+                )
+            )
+
+            addictionId
+        }
     }
 
     override fun getProductForAddiction(addictionId: Long): Flow<ProductEntity?> {

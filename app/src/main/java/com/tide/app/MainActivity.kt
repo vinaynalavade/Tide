@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                         CircularProgressIndicator(color = TidePrimary)
                     }
                 } else {
-                    val startDest = if (settingsState.userSettings.onboardingCompleted) {
+                    val startDest = if (settingsState.userSettings.onboardingCompleted && settingsState.addiction != null) {
                         Screen.Main.route
                     } else {
                         Screen.Onboarding.route

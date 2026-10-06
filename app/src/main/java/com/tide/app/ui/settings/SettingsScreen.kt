@@ -330,8 +330,8 @@ fun SettingsScreen(
             TideCard {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     JourneyItem(label = "Application", value = "Tide")
-                    JourneyItem(label = "Version", value = "1.0.0")
-                    JourneyItem(label = "Build", value = "1")
+                    JourneyItem(label = "Version", value = com.tide.app.BuildConfig.VERSION_NAME)
+                    JourneyItem(label = "Build", value = com.tide.app.BuildConfig.VERSION_CODE.toString())
                     JourneyItem(label = "Architecture", value = "Addiction-Agnostic Local Engine")
 
                     Spacer(modifier = Modifier.height(4.dp))

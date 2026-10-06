@@ -176,10 +176,8 @@ class OnboardingViewModel(
                 active = true
             )
 
-            val addictionId = repository.saveAddiction(addictionEntity)
-
             val productEntity = ProductEntity(
-                addictionId = addictionId,
+                addictionId = 0L,
                 brand = if (s.brandName.isNotBlank()) s.brandName.trim() else "Default",
                 productName = if (s.productName.isNotBlank()) s.productName.trim() else addictionName,
                 unit = finalUnit,
@@ -188,27 +186,34 @@ class OnboardingViewModel(
                 unitsPerBasis = unitsInBasis,
                 unitCost = unitCost
             )
-            repository.saveProduct(productEntity)
 
             val targetAmt = if (s.goalType == "REDUCE") {
                 s.reduceTargetAmount.toDoubleOrNull() ?: (baselineAmountVal / 2)
             } else 0.0
 
             val goalEntity = GoalEntity(
-                addictionId = addictionId,
+                addictionId = 0L,
                 type = s.goalType,
                 targetAmount = targetAmt,
                 targetFrequency = "day",
                 active = true
             )
-            repository.saveGoal(goalEntity)
 
-            // Mark onboarding complete in settings
-            repository.updateUserSettings(
-                UserSettingsEntity(
-                    id = 1,
-                    onboardingCompleted = true
-                )
+            val defaultTriggers = when (s.selectedCategory) {
+                "Smoking", "Vaping" -> listOf("Stress", "Social / Friends", "After Meals", "Boredom", "Driving", "Morning Routine")
+                "Alcohol" -> listOf("Social Gathering", "Stress", "Celebration", "Evening Wind-down", "Boredom", "Sadness")
+                "Social Media", "Gaming" -> listOf("Boredom", "Procrastination", "Late Night", "Stress", "Loneliness")
+                "Gambling", "Shopping" -> listOf("Stress", "Impulse", "Boredom", "Financial Worry", "Social Pressure")
+                "Food / Sugar", "Caffeine" -> listOf("Stress", "Fatigue", "Craving Taste", "Boredom", "Habit")
+                else -> listOf("Stress", "Boredom", "Social", "Habitual Routine", "Emotional Trigger")
+            }
+
+            // Atomically persist all onboarding entities and complete status
+            repository.completeOnboardingTransaction(
+                addiction = addictionEntity,
+                product = productEntity,
+                goal = goalEntity,
+                defaultTriggers = defaultTriggers
             )
 
             _state.value = _state.value.copy(isLoading = false, isComplete = true)

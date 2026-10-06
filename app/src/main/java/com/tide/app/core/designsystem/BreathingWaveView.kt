@@ -48,9 +48,23 @@ fun BreathingWaveView(
     var secondsElapsed by remember { mutableIntStateOf(0) }
     val scaleAnim = remember { Animatable(0.4f) }
 
+    // Timer tracking
     LaunchedEffect(Unit) {
         val startTime = System.currentTimeMillis()
-        while (secondsElapsed < totalSecondsTarget) {
+        while (true) {
+            val elapsed = ((System.currentTimeMillis() - startTime) / 1000).toInt()
+            secondsElapsed = elapsed
+            if (elapsed >= totalSecondsTarget) {
+                onCompleted()
+                break
+            }
+            delay(500)
+        }
+    }
+
+    // Breathing animation cycle
+    LaunchedEffect(Unit) {
+        while (true) {
             // INHALE
             currentPhase = BreathPhase.INHALE
             scaleAnim.animateTo(
@@ -72,20 +86,6 @@ fun BreathingWaveView(
             // REST
             currentPhase = BreathPhase.REST
             delay(BreathPhase.REST.durationMs.toLong())
-
-            secondsElapsed = ((System.currentTimeMillis() - startTime) / 1000).toInt()
-        }
-        onCompleted()
-    }
-
-    LaunchedEffect(Unit) {
-        while (secondsElapsed < totalSecondsTarget) {
-            delay(1000)
-            secondsElapsed++
-            if (secondsElapsed >= totalSecondsTarget) {
-                onCompleted()
-                break
-            }
         }
     }
 
