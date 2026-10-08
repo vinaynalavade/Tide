@@ -20,6 +20,39 @@ interface TideRepository {
     suspend fun saveAddiction(addiction: AddictionEntity): Long
     suspend fun updateAddiction(addiction: AddictionEntity)
 
+    // Multi-Habit Operations
+    fun getActiveHabits(): Flow<List<AddictionEntity>>
+    suspend fun getActiveHabitsSync(): List<AddictionEntity>
+    fun getArchivedHabits(): Flow<List<AddictionEntity>>
+    suspend fun getArchivedHabitsSync(): List<AddictionEntity>
+    fun getAllHabits(): Flow<List<AddictionEntity>>
+    suspend fun getAllHabitsSync(): List<AddictionEntity>
+    fun getHabitById(id: Long): Flow<AddictionEntity?>
+    suspend fun getHabitByIdSync(id: Long): AddictionEntity?
+
+    suspend fun createHabit(
+        habit: AddictionEntity,
+        product: ProductEntity?,
+        goal: GoalEntity,
+        defaultTriggers: List<String> = emptyList()
+    ): Long
+
+    suspend fun updateHabitConfig(
+        habit: AddictionEntity,
+        product: ProductEntity?,
+        goal: GoalEntity?
+    )
+
+    suspend fun archiveHabit(id: Long)
+    suspend fun restoreHabit(id: Long)
+    suspend fun deleteHabit(id: Long): Boolean
+
+    // Undo System
+    suspend fun undoLastConsumption(addictionId: Long): Boolean
+    suspend fun undoLastCraving(addictionId: Long): Boolean
+    suspend fun undoLastSlip(addictionId: Long): Boolean
+    suspend fun undoEntry(type: String, id: Long): Boolean
+
     suspend fun completeOnboardingTransaction(
         addiction: AddictionEntity,
         product: ProductEntity,
@@ -58,7 +91,15 @@ interface TideRepository {
     suspend fun deleteRecoveryGoal(goal: RecoveryGoalEntity)
 
     fun getMilestones(): Flow<List<MilestoneEntity>>
+    fun getMilestonesForHabit(addictionId: Long): Flow<List<MilestoneEntity>>
     suspend fun checkAndUpdateMilestones(
+        streakDays: Int,
+        totalCravings: Int,
+        totalSaved: Double,
+        reductionPct: Double
+    )
+    suspend fun checkAndUpdateMilestonesForHabit(
+        addictionId: Long,
         streakDays: Int,
         totalCravings: Int,
         totalSaved: Double,

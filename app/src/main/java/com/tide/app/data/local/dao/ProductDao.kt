@@ -22,6 +22,9 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE addictionId = :addictionId ORDER BY id DESC LIMIT 1")
     suspend fun getProductForAddictionSync(addictionId: Long): ProductEntity?
 
+    @Query("DELETE FROM products WHERE addictionId = :addictionId")
+    suspend fun deleteForAddiction(addictionId: Long)
+
     @Query("DELETE FROM products")
     suspend fun deleteAll()
 }

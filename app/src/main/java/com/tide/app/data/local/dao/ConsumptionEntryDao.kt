@@ -28,6 +28,12 @@ interface ConsumptionEntryDao {
     @Query("SELECT * FROM consumption_entries WHERE addictionId = :addictionId AND timestamp >= :startTime AND timestamp <= :endTime ORDER BY timestamp ASC")
     suspend fun getEntriesForAddictionBetweenSync(addictionId: Long, startTime: Long, endTime: Long): List<ConsumptionEntryEntity>
 
+    @Query("SELECT * FROM consumption_entries WHERE addictionId = :addictionId ORDER BY timestamp DESC, id DESC LIMIT 1")
+    suspend fun getLatestEntry(addictionId: Long): ConsumptionEntryEntity?
+
+    @Query("DELETE FROM consumption_entries WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
+
     @Query("DELETE FROM consumption_entries")
     suspend fun deleteAll()
 }

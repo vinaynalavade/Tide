@@ -24,6 +24,12 @@ interface SlipEntryDao {
     @Query("SELECT * FROM slip_entries WHERE addictionId = :addictionId AND timestamp >= :startTime AND timestamp <= :endTime ORDER BY timestamp ASC")
     suspend fun getEntriesForAddictionBetweenSync(addictionId: Long, startTime: Long, endTime: Long): List<SlipEntryEntity>
 
+    @Query("SELECT * FROM slip_entries WHERE addictionId = :addictionId ORDER BY timestamp DESC, id DESC LIMIT 1")
+    suspend fun getLatestEntry(addictionId: Long): SlipEntryEntity?
+
+    @Query("DELETE FROM slip_entries WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
+
     @Query("DELETE FROM slip_entries")
     suspend fun deleteAll()
 }

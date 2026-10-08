@@ -2,6 +2,7 @@ package com.tide.app.ui.insights
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +20,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Air
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalAtm
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Spa
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -61,7 +64,7 @@ fun InsightsScreen(
         return
     }
 
-    val addiction = state.addiction ?: return
+    val selectedHabit = state.selectedHabit
 
     Column(
         modifier = Modifier
@@ -74,10 +77,47 @@ fun InsightsScreen(
             subtitle = "Patterns & behavioral trends"
         )
 
+        // Multi-habit selector chips
+        if (state.activeHabits.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                state.activeHabits.forEach { habit ->
+                    val isSelected = habit.id == selectedHabit?.id
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) TidePrimary.copy(alpha = 0.2f) else TideTheme.colors.cardBorder.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (isSelected) TidePrimaryLuminous else Color.Transparent),
+                        modifier = Modifier.clickable { viewModel.selectHabit(habit.id) }
+                    ) {
+                        Text(
+                            text = habit.name,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) TidePrimaryLuminous else TideTheme.colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (selectedHabit == null) {
+            Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                Text("No active habits found.", color = TideTheme.colors.textSecondary)
+            }
+            return
+        }
+
         // Progress Message Card
         ProgressCard(
             progress = state.progressInsight,
-            unit = addiction.unit
+            unit = selectedHabit.unit
         )
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -90,7 +130,7 @@ fun InsightsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Consumption Trend",
+                    text = "${selectedHabit.name} Trend (${selectedHabit.unit})",
                     style = MaterialTheme.typography.titleMedium,
                     color = TideTheme.colors.textPrimary
                 )
@@ -111,34 +151,26 @@ fun InsightsScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            TideCard {
-                TideTrendChart(
-                    data = state.consumptionChartData,
-                    barColor = TidePrimaryLuminous,
-                    unitSuffix = addiction.unit
-                )
-            }
+            TideTrendChart(
+                data = state.consumptionChartData,
+                unitSuffix = selectedHabit.unit
+            )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        // Financial Trends
-        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-            Text(
-                text = "Financial Impact",
-                style = MaterialTheme.typography.titleMedium,
-                color = TideTheme.colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-
+        // Key Impact Metrics (Financial if applicable, else Consumption/Clean rates)
+        if (selectedHabit.hasFinancialImpact) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 MetricCard(
                     title = "Money Saved",
                     value = "₹${state.money.lifetimeSaved.toInt()}",
-                    subtitle = "Projected/yr: ₹${state.money.yearlyProjectedSaved.toInt()}",
+                    subtitle = "₹${state.money.last30DaysSaved.toInt()} in last 30d",
                     icon = Icons.Default.LocalAtm,
                     accentColor = TideSuccess,
                     modifier = Modifier.weight(1f)
@@ -146,9 +178,33 @@ fun InsightsScreen(
                 MetricCard(
                     title = "Money Spent",
                     value = "₹${state.money.lifetimeSpent.toInt()}",
-                    subtitle = "7-day: ₹${state.money.last7DaysSpent.toInt()}",
+                    subtitle = "₹${state.money.last30DaysSpent.toInt()} in last 30d",
                     icon = Icons.Default.LocalAtm,
                     accentColor = TideSlip,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                MetricCard(
+                    title = "Clean / Target Days",
+                    value = "${state.totalCleanDays}",
+                    subtitle = "Out of ${state.totalDaysTracked} tracked days",
+                    icon = Icons.Default.Spa,
+                    accentColor = TideSuccess,
+                    modifier = Modifier.weight(1f)
+                )
+                MetricCard(
+                    title = "Current Avg Use",
+                    value = "${state.progressInsight.currentDailyAverage} ${selectedHabit.unit}",
+                    subtitle = "Baseline: ${selectedHabit.baselineAmount.toInt()} ${selectedHabit.unit}",
+                    icon = Icons.Default.Equalizer,
+                    accentColor = TidePrimaryLuminous,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -217,7 +273,7 @@ fun InsightsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Triggers Breakdown (Section 25 & 26)
+        // Triggers Breakdown
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = "Strongest Triggers",

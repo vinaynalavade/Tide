@@ -33,6 +33,7 @@ data class HistoryDayDetail(
     val cravingsResistedCount: Int,
     val moneySpent: Double,
     val moneySaved: Double,
+    val hasFinancialImpact: Boolean = true,
     val mood: String?,
     val isClean: Boolean,
     val hasSlip: Boolean,
@@ -43,13 +44,17 @@ data class HistoryDayDetail(
 
 data class HistoryUiState(
     val isLoading: Boolean = true,
-    val addiction: AddictionEntity? = null,
+    val activeHabits: List<AddictionEntity> = emptyList(),
+    val selectedHabit: AddictionEntity? = null,
     val product: ProductEntity? = null,
     val goal: GoalEntity? = null,
     val selectedMonth: YearMonth = YearMonth.now(),
     val dailySummaries: Map<LocalDate, DailySummary> = emptyMap(),
     val selectedDayDetail: HistoryDayDetail? = null
-)
+) {
+    // Backward-compatibility alias
+    val addiction: AddictionEntity? get() = selectedHabit
+}
 
 class HistoryViewModel(
     private val repository: TideRepository
@@ -58,6 +63,7 @@ class HistoryViewModel(
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
+    private var selectedHabitIdOverride: Long? = null
     private var allConsumptions = listOf<ConsumptionEntryEntity>()
     private var allCravings = listOf<CravingEntryEntity>()
     private var allSlips = listOf<SlipEntryEntity>()
@@ -69,21 +75,24 @@ class HistoryViewModel(
 
     private fun loadHistory() {
         viewModelScope.launch {
-            repository.getActiveAddiction().collect { addiction ->
-                if (addiction == null) {
+            repository.getActiveHabits().collect { activeHabits ->
+                if (activeHabits.isEmpty()) {
                     _uiState.value = HistoryUiState(isLoading = false)
                     return@collect
                 }
 
+                val habit = activeHabits.find { it.id == selectedHabitIdOverride }
+                    ?: activeHabits.first()
+
                 combine(
                     combine(
-                        repository.getProductForAddiction(addiction.id),
-                        repository.getActiveGoal(addiction.id)
+                        repository.getProductForAddiction(habit.id),
+                        repository.getActiveGoal(habit.id)
                     ) { p, g -> Pair(p, g) },
-                    repository.getConsumptionEntries(addiction.id),
-                    repository.getCravingEntries(addiction.id),
-                    repository.getSlipEntries(addiction.id),
-                    repository.getAllDailyCheckIns(addiction.id)
+                    repository.getConsumptionEntries(habit.id),
+                    repository.getCravingEntries(habit.id),
+                    repository.getSlipEntries(habit.id),
+                    repository.getAllDailyCheckIns(habit.id)
                 ) { (product, goal), consumptions, cravings, slips, checkIns ->
                     allConsumptions = consumptions
                     allCravings = cravings
@@ -91,7 +100,7 @@ class HistoryViewModel(
                     allCheckIns = checkIns
 
                     val today = LocalDate.now()
-                    val startDate = TideCalculationEngine.epochMillisToLocalDate(addiction.startDate)
+                    val startDate = TideCalculationEngine.epochMillisToLocalDate(habit.startDate)
                     val effectiveStart = if (startDate.isAfter(today)) today else startDate
 
                     val consumptionRaw = consumptions.map {
@@ -107,7 +116,7 @@ class HistoryViewModel(
                     val summaries = TideCalculationEngine.buildDailySummaries(
                         startDate = effectiveStart,
                         endDate = today,
-                        goalType = addiction.goalType,
+                        goalType = habit.goalType,
                         targetAmount = goal?.targetAmount ?: 0.0,
                         consumptionEntries = consumptionRaw,
                         slipEntries = slipRaw,
@@ -116,7 +125,8 @@ class HistoryViewModel(
 
                     HistoryUiState(
                         isLoading = false,
-                        addiction = addiction,
+                        activeHabits = activeHabits,
+                        selectedHabit = habit,
                         product = product,
                         goal = goal,
                         selectedMonth = _uiState.value.selectedMonth,
@@ -130,6 +140,12 @@ class HistoryViewModel(
         }
     }
 
+    fun selectHabit(habitId: Long) {
+        selectedHabitIdOverride = habitId
+        _uiState.value = _uiState.value.copy(selectedDayDetail = null)
+        loadHistory()
+    }
+
     fun changeMonth(monthOffset: Long) {
         val nextMonth = _uiState.value.selectedMonth.plusMonths(monthOffset)
         _uiState.value = _uiState.value.copy(selectedMonth = nextMonth)
@@ -137,7 +153,7 @@ class HistoryViewModel(
 
     fun selectDate(date: LocalDate) {
         val s = _uiState.value
-        val addiction = s.addiction ?: return
+        val habit = s.selectedHabit ?: return
         val summary = s.dailySummaries[date] ?: DailySummary(date = date)
 
         val startOfDayMillis = TideCalculationEngine.localDateToStartOfDayMillis(date)
@@ -149,19 +165,20 @@ class HistoryViewModel(
         val dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
         val dayCheckIn = allCheckIns.find { it.date == dateStr }
 
-        val spent = summary.consumptionCost + summary.slipCost
-        val saved = kotlin.math.max(0.0, addiction.baselineCost - spent)
+        val spent = if (habit.hasFinancialImpact) summary.consumptionCost + summary.slipCost else 0.0
+        val saved = if (habit.hasFinancialImpact) kotlin.math.max(0.0, habit.baselineCost - spent) else 0.0
 
         _uiState.value = s.copy(
             selectedDayDetail = HistoryDayDetail(
                 date = date,
                 consumptionAmount = summary.consumptionAmount,
                 targetAmount = s.goal?.targetAmount ?: 0.0,
-                unit = addiction.unit,
+                unit = habit.unit,
                 cravingsCount = summary.cravingsCount,
                 cravingsResistedCount = summary.cravingsResistedCount,
                 moneySpent = spent,
                 moneySaved = saved,
+                hasFinancialImpact = habit.hasFinancialImpact,
                 mood = dayCheckIn?.mood,
                 isClean = summary.isClean,
                 hasSlip = summary.slipAmount > 0,

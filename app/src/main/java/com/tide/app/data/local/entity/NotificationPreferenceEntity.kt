@@ -9,5 +9,6 @@ data class NotificationPreferenceEntity(
     val id: Long = 0,
     val type: String,
     val enabled: Boolean = true,
-    val time: String = "20:00"
+    val time: String = "20:00",
+    val addictionId: Long? = null
 )

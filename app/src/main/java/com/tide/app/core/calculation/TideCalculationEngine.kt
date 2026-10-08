@@ -45,6 +45,13 @@ data class AvoidedResult(
     val lifetimeAvoided: Double
 )
 
+data class TimeResult(
+    val todayMinutesSpent: Long,
+    val todayMinutesSaved: Long,
+    val lifetimeMinutesSpent: Long,
+    val lifetimeMinutesSaved: Long
+)
+
 data class TriggerInsight(
     val name: String,
     val count: Int,
@@ -208,16 +215,20 @@ object TideCalculationEngine {
 
     /**
      * Pure calculation of Money Spent and Saved
+     * Only calculates savings if hasFinancialImpact is true and not in TRACK mode.
      */
     fun calculateMoney(
         dailySummaries: Map<LocalDate, DailySummary>,
         baselineDailyCost: Double,
-        today: LocalDate
+        today: LocalDate,
+        hasFinancialImpact: Boolean = true,
+        goalType: String = "QUIT"
     ): MoneyResult {
-        if (dailySummaries.isEmpty()) {
+        if (!hasFinancialImpact || dailySummaries.isEmpty()) {
             return MoneyResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         }
 
+        val isTrack = goalType.equals("TRACK", ignoreCase = true)
         var lifetimeSpent = 0.0
         var lifetimeSaved = 0.0
 
@@ -235,7 +246,7 @@ object TideCalculationEngine {
 
         for ((date, summary) in dailySummaries) {
             val daySpent = summary.consumptionCost + summary.slipCost
-            val daySaved = max(0.0, baselineDailyCost - daySpent)
+            val daySaved = if (isTrack) 0.0 else max(0.0, baselineDailyCost - daySpent)
 
             lifetimeSpent += daySpent
             lifetimeSaved += daySaved
@@ -255,7 +266,7 @@ object TideCalculationEngine {
         }
 
         val elapsedDays = max(1, dailySummaries.size)
-        val avgDailySaved = lifetimeSaved / elapsedDays
+        val avgDailySaved = if (isTrack) 0.0 else lifetimeSaved / elapsedDays
         val yearlyProjected = avgDailySaved * 365.0
 
         return MoneyResult(
@@ -277,8 +288,13 @@ object TideCalculationEngine {
     fun calculateAvoided(
         dailySummaries: Map<LocalDate, DailySummary>,
         baselineDailyAmount: Double,
-        today: LocalDate
+        today: LocalDate,
+        goalType: String = "QUIT"
     ): AvoidedResult {
+        if (goalType.equals("TRACK", ignoreCase = true) || dailySummaries.isEmpty()) {
+            return AvoidedResult(0.0, 0.0, 0.0)
+        }
+
         var lifetimeAvoided = 0.0
         var todayAvoided = 0.0
         var last7Avoided = 0.0
@@ -301,6 +317,42 @@ object TideCalculationEngine {
             todayAvoided = roundToOneDecimal(todayAvoided),
             last7DaysAvoided = roundToOneDecimal(last7Avoided),
             lifetimeAvoided = roundToOneDecimal(lifetimeAvoided)
+        )
+    }
+
+    /**
+     * Time calculations for time-based habits
+     */
+    fun calculateTime(
+        dailySummaries: Map<LocalDate, DailySummary>,
+        baselineDailyMinutes: Double,
+        today: LocalDate,
+        goalType: String = "QUIT"
+    ): TimeResult {
+        val isTrack = goalType.equals("TRACK", ignoreCase = true)
+        var lifetimeMinutesSpent = 0L
+        var lifetimeMinutesSaved = 0L
+        var todayMinutesSpent = 0L
+        var todayMinutesSaved = 0L
+
+        for ((date, summary) in dailySummaries) {
+            val daySpent = (summary.consumptionAmount + summary.slipAmount).toLong()
+            val daySaved = if (isTrack) 0L else max(0L, (baselineDailyMinutes - daySpent).toLong())
+
+            lifetimeMinutesSpent += daySpent
+            lifetimeMinutesSaved += daySaved
+
+            if (date == today) {
+                todayMinutesSpent = daySpent
+                todayMinutesSaved = daySaved
+            }
+        }
+
+        return TimeResult(
+            todayMinutesSpent = todayMinutesSpent,
+            todayMinutesSaved = todayMinutesSaved,
+            lifetimeMinutesSpent = lifetimeMinutesSpent,
+            lifetimeMinutesSaved = lifetimeMinutesSaved
         )
     }
 

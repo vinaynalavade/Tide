@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,6 +86,43 @@ fun HistoryScreen(
             title = "History",
             subtitle = "Your tracking calendar and daily records"
         )
+
+        // Multi-habit selector chips
+        if (state.activeHabits.size > 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                state.activeHabits.forEach { habit ->
+                    val isSelected = habit.id == state.selectedHabit?.id
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected) TidePrimary.copy(alpha = 0.2f) else TideTheme.colors.cardBorder.copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, if (isSelected) TidePrimaryLuminous else Color.Transparent),
+                        modifier = Modifier.clickable { viewModel.selectHabit(habit.id) }
+                    ) {
+                        Text(
+                            text = habit.name,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) TidePrimaryLuminous else TideTheme.colors.textPrimary,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        if (state.selectedHabit == null) {
+            Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                Text("No active habits found.", color = TideTheme.colors.textSecondary)
+            }
+            return
+        }
 
         // Month Selector Header
         Row(
@@ -339,24 +377,26 @@ private fun DayDetailBottomSheet(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (detail.hasFinancialImpact) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MetricCard(
-                    title = "Money Spent",
-                    value = "₹${detail.moneySpent.toInt()}",
-                    accentColor = TideSlip,
-                    modifier = Modifier.weight(1f)
-                )
-                MetricCard(
-                    title = "Money Saved",
-                    value = "₹${detail.moneySaved.toInt()}",
-                    accentColor = TideSuccess,
-                    modifier = Modifier.weight(1f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    MetricCard(
+                        title = "Money Spent",
+                        value = "₹${detail.moneySpent.toInt()}",
+                        accentColor = TideSlip,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MetricCard(
+                        title = "Money Saved",
+                        value = "₹${detail.moneySaved.toInt()}",
+                        accentColor = TideSuccess,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
 
             if (detail.mood != null) {
@@ -392,7 +432,8 @@ private fun DayDetailBottomSheet(
                 )
             } else {
                 detail.consumptions.forEach { c ->
-                    EntryRow(title = "Consumed ${c.amount.toInt()} ${detail.unit}", subtitle = "₹${c.calculatedCost.toInt()}", timestamp = c.timestamp, icon = Icons.Default.Add, color = TidePrimaryLuminous)
+                    val costLabel = if (detail.hasFinancialImpact) "₹${c.calculatedCost.toInt()}" else "Logged"
+                    EntryRow(title = "Consumed ${c.amount.toInt()} ${detail.unit}", subtitle = costLabel, timestamp = c.timestamp, icon = Icons.Default.Add, color = TidePrimaryLuminous)
                     Spacer(modifier = Modifier.height(6.dp))
                 }
                 detail.slips.forEach { s ->

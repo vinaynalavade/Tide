@@ -30,7 +30,8 @@ enum class TrendTimeframe {
 
 data class InsightsUiState(
     val isLoading: Boolean = true,
-    val addiction: AddictionEntity? = null,
+    val activeHabits: List<AddictionEntity> = emptyList(),
+    val selectedHabit: AddictionEntity? = null,
     val timeframe: TrendTimeframe = TrendTimeframe.LAST_7_DAYS,
     val consumptionChartData: List<ChartBarData> = emptyList(),
     val money: MoneyResult = MoneyResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
@@ -39,7 +40,10 @@ data class InsightsUiState(
     val progressInsight: ProgressInsight = ProgressInsight(0.0, 0.0, 0.0, false, ""),
     val totalCleanDays: Int = 0,
     val totalDaysTracked: Int = 0
-)
+) {
+    // Backward-compatibility alias
+    val addiction: AddictionEntity? get() = selectedHabit
+}
 
 class InsightsViewModel(
     private val repository: TideRepository
@@ -48,8 +52,8 @@ class InsightsViewModel(
     private val _uiState = MutableStateFlow(InsightsUiState())
     val uiState: StateFlow<InsightsUiState> = _uiState.asStateFlow()
 
+    private var selectedHabitIdOverride: Long? = null
     private var cachedSummaries: Map<LocalDate, DailySummary> = emptyMap()
-    private var cachedTriggers: List<TriggerEntity> = emptyList()
 
     init {
         loadInsights()
@@ -57,25 +61,27 @@ class InsightsViewModel(
 
     private fun loadInsights() {
         viewModelScope.launch {
-            repository.getActiveAddiction().collect { addiction ->
-                if (addiction == null) {
+            repository.getActiveHabits().collect { activeHabits ->
+                if (activeHabits.isEmpty()) {
                     _uiState.value = InsightsUiState(isLoading = false)
                     return@collect
                 }
 
+                val habit = activeHabits.find { it.id == selectedHabitIdOverride }
+                    ?: activeHabits.first()
+
                 combine(
                     combine(
-                        repository.getProductForAddiction(addiction.id),
-                        repository.getActiveGoal(addiction.id)
-                    ) { p, g -> Pair(p, g) },
-                    repository.getConsumptionEntries(addiction.id),
-                    repository.getCravingEntries(addiction.id),
-                    repository.getSlipEntries(addiction.id),
+                        repository.getProductForAddiction(habit.id),
+                        repository.getActiveGoal(habit.id)
+                    ) { product, goal -> Pair(product, goal) },
+                    repository.getConsumptionEntries(habit.id),
+                    repository.getCravingEntries(habit.id),
+                    repository.getSlipEntries(habit.id),
                     repository.getAllTriggers()
                 ) { (product, goal), consumptions, cravings, slips, triggers ->
-                    cachedTriggers = triggers
                     val today = LocalDate.now()
-                    val startDate = TideCalculationEngine.epochMillisToLocalDate(addiction.startDate)
+                    val startDate = TideCalculationEngine.epochMillisToLocalDate(habit.startDate)
                     val effectiveStart = if (startDate.isAfter(today)) today else startDate
 
                     val consumptionRaw = consumptions.map {
@@ -94,32 +100,37 @@ class InsightsViewModel(
                     cachedSummaries = TideCalculationEngine.buildDailySummaries(
                         startDate = effectiveStart,
                         endDate = today,
-                        goalType = addiction.goalType,
+                        goalType = habit.goalType,
                         targetAmount = goal?.targetAmount ?: 0.0,
                         consumptionEntries = consumptionRaw,
                         slipEntries = slipRaw,
                         cravingEntries = cravingRaw
                     )
 
-                    val money = TideCalculationEngine.calculateMoney(cachedSummaries, addiction.baselineCost, today)
+                    val money = TideCalculationEngine.calculateMoney(
+                        cachedSummaries,
+                        habit.baselineCost,
+                        today,
+                        hasFinancialImpact = habit.hasFinancialImpact,
+                        goalType = habit.goalType
+                    )
                     val cravingInsight = TideCalculationEngine.calculateCravingInsights(cravingRaw)
 
-                    // Collect all recorded trigger names
                     val triggerOccurrences = mutableListOf<String>()
                     consumptionRaw.forEach { it.triggerName?.let { name -> triggerOccurrences.add(name) } }
                     slipRaw.forEach { it.triggerName?.let { name -> triggerOccurrences.add(name) } }
                     cravingRaw.forEach { it.triggerName?.let { name -> triggerOccurrences.add(name) } }
 
                     val triggersInsight = TideCalculationEngine.calculateTriggerInsights(triggerOccurrences)
-                    val progressInsight = TideCalculationEngine.calculateProgressInsight(cachedSummaries, addiction.baselineAmount)
+                    val progressInsight = TideCalculationEngine.calculateProgressInsight(cachedSummaries, habit.baselineAmount)
 
                     val totalClean = cachedSummaries.values.count { it.isClean }
-
                     val chartData = buildChartData(cachedSummaries, _uiState.value.timeframe, today)
 
                     InsightsUiState(
                         isLoading = false,
-                        addiction = addiction,
+                        activeHabits = activeHabits,
+                        selectedHabit = habit,
                         timeframe = _uiState.value.timeframe,
                         consumptionChartData = chartData,
                         money = money,
@@ -134,6 +145,11 @@ class InsightsViewModel(
                 }
             }
         }
+    }
+
+    fun selectHabit(habitId: Long) {
+        selectedHabitIdOverride = habitId
+        loadInsights()
     }
 
     fun setTimeframe(timeframe: TrendTimeframe) {

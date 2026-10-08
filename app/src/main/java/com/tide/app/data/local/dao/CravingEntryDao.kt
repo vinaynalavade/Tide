@@ -21,6 +21,12 @@ interface CravingEntryDao {
     @Query("SELECT * FROM craving_entries WHERE addictionId = :addictionId AND timestamp >= :startTime AND timestamp <= :endTime ORDER BY timestamp ASC")
     fun getEntriesForAddictionBetween(addictionId: Long, startTime: Long, endTime: Long): Flow<List<CravingEntryEntity>>
 
+    @Query("SELECT * FROM craving_entries WHERE addictionId = :addictionId ORDER BY timestamp DESC, id DESC LIMIT 1")
+    suspend fun getLatestEntry(addictionId: Long): CravingEntryEntity?
+
+    @Query("DELETE FROM craving_entries WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
+
     @Query("DELETE FROM craving_entries")
     suspend fun deleteAll()
 }

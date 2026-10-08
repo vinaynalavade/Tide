@@ -32,6 +32,131 @@ class TideRepositoryImpl(
         database.addictionDao().getActiveAddictionSync()
     }
 
+    override fun getActiveHabits(): Flow<List<AddictionEntity>> {
+        return database.addictionDao().getActiveAddictions()
+    }
+
+    override suspend fun getActiveHabitsSync(): List<AddictionEntity> = withContext(Dispatchers.IO) {
+        database.addictionDao().getActiveAddictionsSync()
+    }
+
+    override fun getArchivedHabits(): Flow<List<AddictionEntity>> {
+        return database.addictionDao().getArchivedAddictions()
+    }
+
+    override suspend fun getArchivedHabitsSync(): List<AddictionEntity> = withContext(Dispatchers.IO) {
+        database.addictionDao().getArchivedAddictionsSync()
+    }
+
+    override fun getAllHabits(): Flow<List<AddictionEntity>> {
+        return database.addictionDao().getAllAddictions()
+    }
+
+    override suspend fun getAllHabitsSync(): List<AddictionEntity> = withContext(Dispatchers.IO) {
+        database.addictionDao().getAllAddictionsSync()
+    }
+
+    override fun getHabitById(id: Long): Flow<AddictionEntity?> {
+        return database.addictionDao().getAddictionByIdFlow(id)
+    }
+
+    override suspend fun getHabitByIdSync(id: Long): AddictionEntity? = withContext(Dispatchers.IO) {
+        database.addictionDao().getAddictionById(id)
+    }
+
+    override suspend fun createHabit(
+        habit: AddictionEntity,
+        product: ProductEntity?,
+        goal: GoalEntity,
+        defaultTriggers: List<String>
+    ): Long = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            val habitId = database.addictionDao().insertAddiction(habit)
+            if (product != null) {
+                database.productDao().insertProduct(product.copy(addictionId = habitId))
+            }
+            database.goalDao().insert(goal.copy(addictionId = habitId))
+
+            for (triggerName in defaultTriggers) {
+                database.triggerDao().insert(TriggerEntity(name = triggerName, category = habit.category))
+            }
+            habitId
+        }
+    }
+
+    override suspend fun updateHabitConfig(
+        habit: AddictionEntity,
+        product: ProductEntity?,
+        goal: GoalEntity?
+    ) = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            database.addictionDao().updateAddiction(habit)
+
+            if (product != null) {
+                val existingProduct = database.productDao().getProductForAddictionSync(habit.id)
+                if (existingProduct != null) {
+                    database.productDao().updateProduct(product.copy(id = existingProduct.id, addictionId = habit.id))
+                } else {
+                    database.productDao().insertProduct(product.copy(addictionId = habit.id))
+                }
+            }
+
+            if (goal != null) {
+                val existingGoal = database.goalDao().getActiveGoalSync(habit.id)
+                if (existingGoal != null) {
+                    database.goalDao().update(goal.copy(id = existingGoal.id, addictionId = habit.id))
+                } else {
+                    database.goalDao().insert(goal.copy(addictionId = habit.id))
+                }
+            }
+        }
+    }
+
+    override suspend fun archiveHabit(id: Long) = withContext(Dispatchers.IO) {
+        database.addictionDao().archiveAddiction(id, System.currentTimeMillis())
+    }
+
+    override suspend fun restoreHabit(id: Long) = withContext(Dispatchers.IO) {
+        database.addictionDao().restoreAddiction(id)
+    }
+
+    override suspend fun deleteHabit(id: Long): Boolean = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            database.productDao().deleteForAddiction(id)
+            database.addictionDao().deleteById(id) > 0
+        }
+    }
+
+    override suspend fun undoLastConsumption(addictionId: Long): Boolean = withContext(Dispatchers.IO) {
+        val last = database.consumptionEntryDao().getLatestEntry(addictionId)
+        if (last != null) {
+            database.consumptionEntryDao().deleteById(last.id) > 0
+        } else false
+    }
+
+    override suspend fun undoLastCraving(addictionId: Long): Boolean = withContext(Dispatchers.IO) {
+        val last = database.cravingEntryDao().getLatestEntry(addictionId)
+        if (last != null) {
+            database.cravingEntryDao().deleteById(last.id) > 0
+        } else false
+    }
+
+    override suspend fun undoLastSlip(addictionId: Long): Boolean = withContext(Dispatchers.IO) {
+        val last = database.slipEntryDao().getLatestEntry(addictionId)
+        if (last != null) {
+            database.slipEntryDao().deleteById(last.id) > 0
+        } else false
+    }
+
+    override suspend fun undoEntry(type: String, id: Long): Boolean = withContext(Dispatchers.IO) {
+        when (type.uppercase()) {
+            "CONSUMPTION" -> database.consumptionEntryDao().deleteById(id) > 0
+            "CRAVING" -> database.cravingEntryDao().deleteById(id) > 0
+            "SLIP" -> database.slipEntryDao().deleteById(id) > 0
+            else -> false
+        }
+    }
+
     override suspend fun saveAddiction(addiction: AddictionEntity): Long = withContext(Dispatchers.IO) {
         database.addictionDao().insertAddiction(addiction)
     }
@@ -175,6 +300,10 @@ class TideRepositoryImpl(
         return database.milestoneDao().getAll()
     }
 
+    override fun getMilestonesForHabit(addictionId: Long): Flow<List<MilestoneEntity>> {
+        return database.milestoneDao().getMilestonesForAddiction(addictionId)
+    }
+
     override suspend fun checkAndUpdateMilestones(
         streakDays: Int,
         totalCravings: Int,
@@ -202,6 +331,38 @@ class TideRepositoryImpl(
 
             if (isAchieved) {
                 database.milestoneDao().update(m.copy(achievedAt = now))
+            }
+        }
+    }
+
+    override suspend fun checkAndUpdateMilestonesForHabit(
+        addictionId: Long,
+        streakDays: Int,
+        totalCravings: Int,
+        totalSaved: Double,
+        reductionPct: Double
+    ) = withContext(Dispatchers.IO) {
+        val habitMilestones = database.milestoneDao().getMilestonesForAddictionSync(addictionId)
+        val now = System.currentTimeMillis()
+
+        for (m in habitMilestones) {
+            if (m.achievedAt != null) continue // Already unlocked
+
+            val isAchieved = when (m.type) {
+                "STREAK_1D" -> streakDays >= 1
+                "STREAK_7D" -> streakDays >= 7
+                "STREAK_14D" -> streakDays >= 14
+                "STREAK_30D" -> streakDays >= 30
+                "CRAVINGS_10" -> totalCravings >= 10
+                "CRAVINGS_50" -> totalCravings >= 50
+                "SAVED_5000" -> totalSaved >= 5000.0
+                "SAVED_10000" -> totalSaved >= 10000.0
+                "REDUCTION_50" -> reductionPct >= 50.0
+                else -> false
+            }
+
+            if (isAchieved) {
+                database.milestoneDao().update(m.copy(achievedAt = now, addictionId = addictionId))
             }
         }
     }
@@ -237,24 +398,60 @@ class TideRepositoryImpl(
     override suspend fun exportAllDataJson(): String = withContext(Dispatchers.IO) {
         val root = JSONObject()
         root.put("app", "Tide")
-        root.put("version", "1.0.0")
-        root.put("build", 1)
+        root.put("version", "1.1.0")
+        root.put("build", 2)
         root.put("exportedAt", System.currentTimeMillis())
 
-        val addiction = database.addictionDao().getActiveAddictionSync()
-        if (addiction != null) {
-            val addObj = JSONObject().apply {
-                put("name", addiction.name)
-                put("category", addiction.category)
-                put("unit", addiction.unit)
-                put("baselineAmount", addiction.baselineAmount)
-                put("baselineCost", addiction.baselineCost)
-                put("goalType", addiction.goalType)
-                put("startDate", addiction.startDate)
-            }
-            root.put("addiction", addObj)
+        val allHabits = database.addictionDao().getAllAddictionsSync()
+        val habitsArray = JSONArray()
 
-            val consumptions = database.consumptionEntryDao().getEntriesForAddictionSync(addiction.id)
+        for (habit in allHabits) {
+            val habitObj = JSONObject().apply {
+                put("id", habit.id)
+                put("name", habit.name)
+                put("category", habit.category)
+                put("unit", habit.unit)
+                put("customUnit", habit.customUnit)
+                put("baselineAmount", habit.baselineAmount)
+                put("baselineFrequency", habit.baselineFrequency)
+                put("baselineCost", habit.baselineCost)
+                put("currency", habit.currency)
+                put("goalType", habit.goalType)
+                put("startDate", habit.startDate)
+                put("active", habit.active)
+                put("hasFinancialImpact", habit.hasFinancialImpact)
+                put("hasTimeImpact", habit.hasTimeImpact)
+                put("unitType", habit.unitType)
+                put("isArchived", habit.isArchived)
+                put("archivedAt", habit.archivedAt)
+                put("icon", habit.icon)
+            }
+
+            // Product
+            val product = database.productDao().getProductForAddictionSync(habit.id)
+            if (product != null) {
+                habitObj.put("product", JSONObject().apply {
+                    put("brand", product.brand)
+                    put("productName", product.productName)
+                    put("price", product.price)
+                    put("pricingBasis", product.pricingBasis)
+                    put("unitsPerBasis", product.unitsPerBasis)
+                    put("unitCost", product.unitCost)
+                })
+            }
+
+            // Goal
+            val goal = database.goalDao().getActiveGoalSync(habit.id)
+            if (goal != null) {
+                habitObj.put("goal", JSONObject().apply {
+                    put("type", goal.type)
+                    put("targetAmount", goal.targetAmount)
+                    put("targetFrequency", goal.targetFrequency)
+                })
+            }
+
+            // Consumptions
+            val consumptions = database.consumptionEntryDao().getEntriesForAddictionSync(habit.id)
             val cArray = JSONArray()
             consumptions.forEach {
                 cArray.put(JSONObject().apply {
@@ -264,9 +461,10 @@ class TideRepositoryImpl(
                     put("note", it.note)
                 })
             }
-            root.put("consumptionEntries", cArray)
+            habitObj.put("consumptionEntries", cArray)
 
-            val cravings = database.cravingEntryDao().getEntriesForAddictionSync(addiction.id)
+            // Cravings
+            val cravings = database.cravingEntryDao().getEntriesForAddictionSync(habit.id)
             val crArray = JSONArray()
             cravings.forEach {
                 crArray.put(JSONObject().apply {
@@ -277,9 +475,10 @@ class TideRepositoryImpl(
                     put("note", it.note)
                 })
             }
-            root.put("cravingEntries", crArray)
+            habitObj.put("cravingEntries", crArray)
 
-            val slips = database.slipEntryDao().getEntriesForAddictionSync(addiction.id)
+            // Slips
+            val slips = database.slipEntryDao().getEntriesForAddictionSync(habit.id)
             val sArray = JSONArray()
             slips.forEach {
                 sArray.put(JSONObject().apply {
@@ -290,9 +489,10 @@ class TideRepositoryImpl(
                     put("note", it.note)
                 })
             }
-            root.put("slipEntries", sArray)
+            habitObj.put("slipEntries", sArray)
 
-            val checkIns = database.dailyCheckInDao().getAllCheckInsSync(addiction.id)
+            // Check-ins
+            val checkIns = database.dailyCheckInDao().getAllCheckInsSync(habit.id)
             val ciArray = JSONArray()
             checkIns.forEach {
                 ciArray.put(JSONObject().apply {
@@ -303,7 +503,25 @@ class TideRepositoryImpl(
                     put("note", it.note)
                 })
             }
-            root.put("dailyCheckIns", ciArray)
+            habitObj.put("dailyCheckIns", ciArray)
+
+            habitsArray.put(habitObj)
+        }
+        root.put("habits", habitsArray)
+
+        // Single addiction backward-compatibility node
+        val activeAddiction = database.addictionDao().getActiveAddictionSync()
+        if (activeAddiction != null) {
+            val addObj = JSONObject().apply {
+                put("name", activeAddiction.name)
+                put("category", activeAddiction.category)
+                put("unit", activeAddiction.unit)
+                put("baselineAmount", activeAddiction.baselineAmount)
+                put("baselineCost", activeAddiction.baselineCost)
+                put("goalType", activeAddiction.goalType)
+                put("startDate", activeAddiction.startDate)
+            }
+            root.put("addiction", addObj)
         }
 
         root.toString(2)

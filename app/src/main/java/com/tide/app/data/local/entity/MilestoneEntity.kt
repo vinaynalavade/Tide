@@ -11,5 +11,6 @@ data class MilestoneEntity(
     val title: String,
     val description: String,
     val targetValue: Double,
-    val achievedAt: Long? = null
+    val achievedAt: Long? = null,
+    val addictionId: Long? = null
 )

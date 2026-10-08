@@ -16,17 +16,44 @@ interface AddictionDao {
     @Update
     suspend fun updateAddiction(addiction: AddictionEntity)
 
-    @Query("SELECT * FROM addictions WHERE active = 1 ORDER BY id DESC LIMIT 1")
+    @Query("SELECT * FROM addictions WHERE active = 1 AND isArchived = 0 ORDER BY displayOrder ASC, id ASC LIMIT 1")
     fun getActiveAddiction(): Flow<AddictionEntity?>
 
-    @Query("SELECT * FROM addictions WHERE active = 1 ORDER BY id DESC LIMIT 1")
+    @Query("SELECT * FROM addictions WHERE active = 1 AND isArchived = 0 ORDER BY displayOrder ASC, id ASC LIMIT 1")
     suspend fun getActiveAddictionSync(): AddictionEntity?
 
-    @Query("SELECT * FROM addictions ORDER BY id DESC")
+    @Query("SELECT * FROM addictions WHERE active = 1 AND isArchived = 0 ORDER BY displayOrder ASC, id ASC")
+    fun getActiveAddictions(): Flow<List<AddictionEntity>>
+
+    @Query("SELECT * FROM addictions WHERE active = 1 AND isArchived = 0 ORDER BY displayOrder ASC, id ASC")
+    suspend fun getActiveAddictionsSync(): List<AddictionEntity>
+
+    @Query("SELECT * FROM addictions WHERE isArchived = 1 ORDER BY archivedAt DESC, id DESC")
+    fun getArchivedAddictions(): Flow<List<AddictionEntity>>
+
+    @Query("SELECT * FROM addictions WHERE isArchived = 1 ORDER BY archivedAt DESC, id DESC")
+    suspend fun getArchivedAddictionsSync(): List<AddictionEntity>
+
+    @Query("SELECT * FROM addictions ORDER BY displayOrder ASC, id ASC")
     fun getAllAddictions(): Flow<List<AddictionEntity>>
+
+    @Query("SELECT * FROM addictions ORDER BY displayOrder ASC, id ASC")
+    suspend fun getAllAddictionsSync(): List<AddictionEntity>
 
     @Query("SELECT * FROM addictions WHERE id = :id")
     suspend fun getAddictionById(id: Long): AddictionEntity?
+
+    @Query("SELECT * FROM addictions WHERE id = :id")
+    fun getAddictionByIdFlow(id: Long): Flow<AddictionEntity?>
+
+    @Query("UPDATE addictions SET isArchived = 1, archivedAt = :timestamp WHERE id = :id")
+    suspend fun archiveAddiction(id: Long, timestamp: Long)
+
+    @Query("UPDATE addictions SET isArchived = 0, archivedAt = NULL WHERE id = :id")
+    suspend fun restoreAddiction(id: Long)
+
+    @Query("DELETE FROM addictions WHERE id = :id")
+    suspend fun deleteById(id: Long): Int
 
     @Query("DELETE FROM addictions")
     suspend fun deleteAll()

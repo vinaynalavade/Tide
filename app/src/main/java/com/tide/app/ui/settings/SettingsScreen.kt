@@ -20,15 +20,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -57,7 +62,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tide.app.core.designsystem.TideCard
 import com.tide.app.core.designsystem.TidePrimaryButton
-import com.tide.app.core.designsystem.TideSecondaryButton
 import com.tide.app.core.designsystem.TideTopBar
 import com.tide.app.core.theme.TidePrimary
 import com.tide.app.core.theme.TidePrimaryLuminous
@@ -65,9 +69,10 @@ import com.tide.app.core.theme.TideSlip
 import com.tide.app.core.theme.TideSuccess
 import com.tide.app.core.theme.TideTheme
 import com.tide.app.core.update.UpdateState
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import com.tide.app.data.local.entity.AddictionEntity
+import com.tide.app.ui.habits.AddEditHabitBottomSheet
+import com.tide.app.ui.habits.ArchivedHabitsBottomSheet
+import com.tide.app.ui.habits.ManageHabitsBottomSheet
 
 @Composable
 fun SettingsScreen(
@@ -82,12 +87,16 @@ fun SettingsScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showLicensesDialog by remember { mutableStateOf(false) }
 
+    // Multi-habit management bottom sheets
+    var showManageHabitsSheet by remember { mutableStateOf(false) }
+    var showAddEditHabitSheet by remember { mutableStateOf(false) }
+    var habitToEdit by remember { mutableStateOf<AddictionEntity?>(null) }
+    var showArchivedHabitsSheet by remember { mutableStateOf(false) }
+
     if (state.isDataDeleted) {
         onResetToOnboarding()
         return
     }
-
-    val addiction = state.addiction
 
     Column(
         modifier = Modifier
@@ -97,83 +106,199 @@ fun SettingsScreen(
     ) {
         TideTopBar(
             title = "Settings",
-            subtitle = "Preferences, data, & updates"
+            subtitle = "Preferences, habits & data management"
         )
 
-        // SECTION: YOUR JOURNEY
-        if (addiction != null) {
-            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+        // ==========================================
+        // SECTION 1: MY HABITS
+        // ==========================================
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Your Journey",
+                    text = "My Habits",
                     style = MaterialTheme.typography.titleMedium,
                     color = TideTheme.colors.textPrimary
                 )
-                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "${state.activeHabits.size} Active",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TidePrimaryLuminous
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
 
-                val startDateStr = Instant.ofEpochMilli(addiction.startDate)
-                    .atZone(ZoneId.systemDefault())
-                    .format(DateTimeFormatter.ofPattern("MMMM d, yyyy"))
-
-                TideCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        JourneyItem(label = "Habit / Addiction", value = addiction.name)
-                        JourneyItem(label = "Tracking Unit", value = addiction.unit)
-                        state.product?.let { p ->
-                            if (p.brand.isNotBlank() && p.brand != "Default") {
-                                JourneyItem(label = "Brand", value = p.brand)
+            TideCard {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // Quick Action: Manage Habits
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showManageHabitsSheet = true },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.List, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Manage Habits", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                                Text("Edit configuration, archive, or reorder", style = MaterialTheme.typography.bodySmall, color = TideTheme.colors.textSecondary)
                             }
-                            JourneyItem(label = "Unit Price", value = "₹${p.unitCost.toInt()} per ${p.unit}")
                         }
-                        JourneyItem(label = "Baseline", value = "${addiction.baselineAmount.toInt()} ${addiction.unit} / ${addiction.baselineFrequency}")
-                        JourneyItem(label = "Goal", value = "${addiction.goalType} Mode")
-                        JourneyItem(label = "Started On", value = startDateStr)
+                        Text("Manage →", style = MaterialTheme.typography.labelSmall, color = TidePrimaryLuminous)
+                    }
+
+                    // Quick Action: Add Habit
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                habitToEdit = null
+                                showAddEditHabitSheet = true
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = TideSuccess, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Add Habit", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                                Text("Smoking, Sugar, Gaming, Custom & more", style = MaterialTheme.typography.bodySmall, color = TideTheme.colors.textSecondary)
+                            }
+                        }
+                        Text("Add +", style = MaterialTheme.typography.labelSmall, color = TideSuccess)
+                    }
+
+                    // Quick Action: Archived Habits
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showArchivedHabitsSheet = true },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Archive, contentDescription = null, tint = TideTheme.colors.textSecondary, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Archived Habits", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                                Text("${state.archivedHabits.size} archived", style = MaterialTheme.typography.bodySmall, color = TideTheme.colors.textSecondary)
+                            }
+                        }
+                        Text("View →", style = MaterialTheme.typography.labelSmall, color = TideTheme.colors.textSecondary)
+                    }
+
+                    // Active Habit Summary List
+                    if (state.activeHabits.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Active Habit Configurations",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TideTheme.colors.textSecondary
+                        )
+
+                        state.activeHabits.forEach { habit ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = TideTheme.colors.cardBackground.copy(alpha = 0.5f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(habit.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                                        Text(
+                                            "${habit.goalType} • ${habit.unit} • ${if (habit.hasFinancialImpact) "Financial" else "Non-Financial"}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TideTheme.colors.textSecondary
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            habitToEdit = habit
+                                            showAddEditHabitSheet = true
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Edit habit", tint = TidePrimaryLuminous, modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // SECTION: PREFERENCES
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ==========================================
+        // SECTION 2: GOALS & TARGETS
+        // ==========================================
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
-                text = "Appearance & Preferences",
+                text = "Goals & Targets",
                 style = MaterialTheme.typography.titleMedium,
                 color = TideTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.height(10.dp))
 
             TideCard {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // Theme selector
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Palette, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text("Theme", style = MaterialTheme.typography.bodyMedium, color = TideTheme.colors.textPrimary)
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.Flag, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("Universal Goal Architecture", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "Tide supports TRACK, REDUCE, and QUIT modes. Goal transitions are effective from today onward — historical streaks, milestones, and past logs remain immutable.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TideTheme.colors.textSecondary
+                            )
                         }
+                    }
+                }
+            }
+        }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            listOf("system", "light", "dark").forEach { mode ->
-                                val isSelected = state.userSettings.themeMode == mode
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) TidePrimary.copy(alpha = 0.15f) else Color.Transparent,
-                                    border = BorderStroke(1.dp, if (isSelected) TidePrimaryLuminous else TideTheme.colors.cardBorder),
-                                    modifier = Modifier.clickable { viewModel.setTheme(mode) }
-                                ) {
-                                    Text(
-                                        text = mode.replaceFirstChar { it.uppercase() },
-                                        fontSize = 11.sp,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isSelected) TidePrimaryLuminous else TideTheme.colors.textSecondary,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                    )
-                                }
-                            }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ==========================================
+        // SECTION 3: TRACKING & WIDGET
+        // ==========================================
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = "Tracking & Quick Actions",
+                style = MaterialTheme.typography.titleMedium,
+                color = TideTheme.colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            TideCard {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    // Home-Screen Widget Info
+                    Row(verticalAlignment = Alignment.Top) {
+                        Icon(Icons.Default.Widgets, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("Android Home-Screen Widget", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                "Log consumption, capture cravings, undo recent logs, and cycle habits directly from your Android home-screen widget without launching the full application.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TideTheme.colors.textSecondary
+                            )
                         }
                     }
 
@@ -200,7 +325,9 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECTION: NOTIFICATIONS
+        // ==========================================
+        // SECTION 4: NOTIFICATIONS
+        // ==========================================
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = "Notifications",
@@ -237,26 +364,87 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECTION: IN-APP UPDATE (Section 31)
+        // ==========================================
+        // SECTION 5: APPEARANCE
+        // ==========================================
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
-                text = "App Updates",
+                text = "Appearance",
                 style = MaterialTheme.typography.titleMedium,
                 color = TideTheme.colors.textPrimary
             )
             Spacer(modifier = Modifier.height(10.dp))
 
-            InAppUpdateSection(
-                updateState = updateState,
-                onCheckUpdates = { viewModel.checkForUpdates() },
-                onStartUpdate = { (context as? Activity)?.let { viewModel.startUpdate(it) } },
-                onCompleteUpdate = { viewModel.completeUpdate() }
-            )
+            TideCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Palette, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Theme", style = MaterialTheme.typography.bodyMedium, color = TideTheme.colors.textPrimary)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("system", "light", "dark").forEach { mode ->
+                            val isSelected = state.userSettings.themeMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) TidePrimary.copy(alpha = 0.15f) else Color.Transparent,
+                                border = BorderStroke(1.dp, if (isSelected) TidePrimaryLuminous else TideTheme.colors.cardBorder),
+                                modifier = Modifier.clickable { viewModel.setTheme(mode) }
+                            ) {
+                                Text(
+                                    text = mode.replaceFirstChar { it.uppercase() },
+                                    fontSize = 11.sp,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) TidePrimaryLuminous else TideTheme.colors.textSecondary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECTION: DATA & PRIVACY
+        // ==========================================
+        // SECTION 6: ACCOUNT & ARCHITECTURE
+        // ==========================================
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = "Account & Sync",
+                style = MaterialTheme.typography.titleMedium,
+                color = TideTheme.colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            TideCard {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(Icons.Default.Person, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text("Local-First Architecture", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            "Status: Offline Local Storage (100% Private)\nAll tracking and configurations are stored directly on this device. Future cloud sync and cross-device backup architecture are prepared without compromising local speed or privacy.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TideTheme.colors.textSecondary
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ==========================================
+        // SECTION 7: PRIVACY & DATA
+        // ==========================================
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = "Privacy & Data",
@@ -272,9 +460,9 @@ fun SettingsScreen(
                         Icon(Icons.Default.Security, contentDescription = null, tint = TideSuccess, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
-                            Text("100% Local-First & Private", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
+                            Text("100% Private & Telemetry-Free", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = TideTheme.colors.textPrimary)
                             Text(
-                                "Your tracking data stays on your device. Tide does not sell your behavioral data or run telemetry trackers.",
+                                "Your tracking data remains on your device. Tide does not sell your behavioral data or run telemetry trackers.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TideTheme.colors.textSecondary
                             )
@@ -292,7 +480,7 @@ fun SettingsScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.FileDownload, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Export All Data (JSON)", style = MaterialTheme.typography.bodyMedium, color = TideTheme.colors.textPrimary)
+                            Text("Export All Habits Data (JSON)", style = MaterialTheme.typography.bodyMedium, color = TideTheme.colors.textPrimary)
                         }
                         Text("Export →", style = MaterialTheme.typography.labelSmall, color = TidePrimaryLuminous)
                     }
@@ -318,7 +506,30 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // SECTION: ABOUT TIDE (Section 32)
+        // ==========================================
+        // SECTION 8: APP UPDATES
+        // ==========================================
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = "App Updates",
+                style = MaterialTheme.typography.titleMedium,
+                color = TideTheme.colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            InAppUpdateSection(
+                updateState = updateState,
+                onCheckUpdates = { viewModel.checkForUpdates() },
+                onStartUpdate = { (context as? Activity)?.let { viewModel.startUpdate(it) } },
+                onCompleteUpdate = { viewModel.completeUpdate() }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ==========================================
+        // SECTION 9: ABOUT
+        // ==========================================
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             Text(
                 text = "About",
@@ -332,7 +543,7 @@ fun SettingsScreen(
                     JourneyItem(label = "Application", value = "Tide")
                     JourneyItem(label = "Version", value = com.tide.app.BuildConfig.VERSION_NAME)
                     JourneyItem(label = "Build", value = com.tide.app.BuildConfig.VERSION_CODE.toString())
-                    JourneyItem(label = "Architecture", value = "Addiction-Agnostic Local Engine")
+                    JourneyItem(label = "Architecture", value = "Addiction-Agnostic Multi-Habit Platform")
 
                     Spacer(modifier = Modifier.height(4.dp))
 
@@ -351,11 +562,73 @@ fun SettingsScreen(
         }
     }
 
+    // ==========================================
+    // BOTTOM SHEETS: HABIT MANAGEMENT
+    // ==========================================
+    if (showManageHabitsSheet) {
+        ManageHabitsBottomSheet(
+            activeHabits = state.activeHabits,
+            onDismiss = { showManageHabitsSheet = false },
+            onAddNewHabit = {
+                showManageHabitsSheet = false
+                habitToEdit = null
+                showAddEditHabitSheet = true
+            },
+            onEditHabit = { habit ->
+                showManageHabitsSheet = false
+                habitToEdit = habit
+                showAddEditHabitSheet = true
+            },
+            onArchiveHabit = { habitId ->
+                viewModel.archiveHabit(habitId)
+            },
+            onDeleteHabit = { habitId ->
+                viewModel.deleteHabit(habitId)
+            },
+            onViewArchived = {
+                showManageHabitsSheet = false
+                showArchivedHabitsSheet = true
+            }
+        )
+    }
+
+    if (showAddEditHabitSheet) {
+        AddEditHabitBottomSheet(
+            habitToEdit = habitToEdit,
+            onDismiss = {
+                showAddEditHabitSheet = false
+                habitToEdit = null
+            },
+            onSaveHabit = { habit, product, goal ->
+                if (habitToEdit == null) {
+                    viewModel.createHabit(habit, product, goal)
+                } else {
+                    viewModel.updateHabitConfig(habit, product, goal)
+                }
+                showAddEditHabitSheet = false
+                habitToEdit = null
+            }
+        )
+    }
+
+    if (showArchivedHabitsSheet) {
+        ArchivedHabitsBottomSheet(
+            archivedHabits = state.archivedHabits,
+            onDismiss = { showArchivedHabitsSheet = false },
+            onRestoreHabit = { habitId ->
+                viewModel.restoreHabit(habitId)
+            },
+            onDeleteHabit = { habitId ->
+                viewModel.deleteHabit(habitId)
+            }
+        )
+    }
+
     // EXPORT JSON DIALOG
     state.exportedJson?.let { jsonString ->
         AlertDialog(
             onDismissRequest = { viewModel.clearExportDialog() },
-            title = { Text("Exported Data") },
+            title = { Text("Exported Data (v1.1.0)") },
             text = {
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                     Text(
@@ -388,7 +661,7 @@ fun SettingsScreen(
             onDismissRequest = { showDeleteConfirmDialog = false },
             title = { Text("Delete All Data?", color = TideSlip) },
             text = {
-                Text("This action will permanently delete all your tracking entries, cravings, check-ins, and goals. This cannot be undone.")
+                Text("This action will permanently delete all your tracking entries, habits, cravings, check-ins, and goals. This cannot be undone.")
             },
             confirmButton = {
                 TextButton(onClick = {
@@ -464,7 +737,7 @@ private fun InAppUpdateSection(
             when (updateState) {
                 is UpdateState.Idle, is UpdateState.UpToDate -> {
                     Text(
-                        text = "Tide is up to date (Version 1.0.0, Build 1).",
+                        text = "Tide is up to date (Version ${com.tide.app.BuildConfig.VERSION_NAME}, Build ${com.tide.app.BuildConfig.VERSION_CODE}).",
                         style = MaterialTheme.typography.bodySmall,
                         color = TideTheme.colors.textSecondary
                     )

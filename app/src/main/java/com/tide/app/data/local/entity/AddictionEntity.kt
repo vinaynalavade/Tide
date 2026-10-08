@@ -17,5 +17,13 @@ data class AddictionEntity(
     val currency: String = "INR",
     val goalType: String, // "QUIT", "REDUCE", "TRACK"
     val startDate: Long, // Epoch millis
-    val active: Boolean = true
+    val active: Boolean = true,
+    val hasFinancialImpact: Boolean = true,
+    val hasTimeImpact: Boolean = false,
+    val unitType: String = "COUNT", // "COUNT", "TIME", "CURRENCY"
+    val isArchived: Boolean = false,
+    val archivedAt: Long? = null,
+    val displayOrder: Int = 0,
+    val icon: String = "default",
+    val color: String = "#0A84FF"
 )

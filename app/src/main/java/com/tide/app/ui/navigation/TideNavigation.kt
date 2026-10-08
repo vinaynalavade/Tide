@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -99,10 +100,11 @@ fun MainContainerScreen(
     onNavigateToCravingMode: () -> Unit,
     onResetToOnboarding: () -> Unit
 ) {
+    val context = LocalContext.current.applicationContext
     var selectedTab by remember { mutableStateOf(TideNavTab.HOME) }
     var showQuickLogSheet by remember { mutableStateOf(false) }
 
-    val homeViewModel = remember { HomeViewModel(repository) }
+    val homeViewModel = remember { HomeViewModel(repository, context) }
     val insightsViewModel = remember { InsightsViewModel(repository) }
     val historyViewModel = remember { HistoryViewModel(repository) }
     val goalsViewModel = remember { GoalsViewModel(repository) }

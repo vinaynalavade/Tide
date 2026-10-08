@@ -22,8 +22,17 @@ interface MilestoneDao {
     @Query("SELECT * FROM milestones ORDER BY id ASC")
     suspend fun getAllSync(): List<MilestoneEntity>
 
+    @Query("SELECT * FROM milestones WHERE addictionId = :addictionId OR addictionId IS NULL ORDER BY id ASC")
+    fun getMilestonesForAddiction(addictionId: Long): Flow<List<MilestoneEntity>>
+
+    @Query("SELECT * FROM milestones WHERE addictionId = :addictionId OR addictionId IS NULL ORDER BY id ASC")
+    suspend fun getMilestonesForAddictionSync(addictionId: Long): List<MilestoneEntity>
+
     @Query("SELECT * FROM milestones WHERE type = :type LIMIT 1")
     suspend fun getByType(type: String): MilestoneEntity?
+
+    @Query("SELECT * FROM milestones WHERE type = :type AND (addictionId = :addictionId OR (:addictionId IS NULL AND addictionId IS NULL)) LIMIT 1")
+    suspend fun getByTypeAndAddiction(type: String, addictionId: Long?): MilestoneEntity?
 
     @Query("DELETE FROM milestones")
     suspend fun deleteAll()

@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
         NotificationPreferenceEntity::class,
         UserSettingsEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class TideDatabase : RoomDatabase() {
@@ -70,6 +70,22 @@ abstract class TideDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: TideDatabase? = null
 
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE addictions ADD COLUMN hasFinancialImpact INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN hasTimeImpact INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN unitType TEXT NOT NULL DEFAULT 'COUNT'")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN archivedAt INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN displayOrder INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN icon TEXT NOT NULL DEFAULT 'default'")
+                db.execSQL("ALTER TABLE addictions ADD COLUMN color TEXT NOT NULL DEFAULT '#0A84FF'")
+
+                db.execSQL("ALTER TABLE milestones ADD COLUMN addictionId INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE notification_preferences ADD COLUMN addictionId INTEGER DEFAULT NULL")
+            }
+        }
+
         fun getInstance(context: Context): TideDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -77,6 +93,7 @@ abstract class TideDatabase : RoomDatabase() {
                     TideDatabase::class.java,
                     "tide_database"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

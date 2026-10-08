@@ -22,6 +22,9 @@ interface NotificationPreferenceDao {
     @Query("SELECT * FROM notification_preferences ORDER BY id ASC")
     suspend fun getAllSync(): List<NotificationPreferenceEntity>
 
+    @Query("SELECT * FROM notification_preferences WHERE addictionId = :addictionId OR addictionId IS NULL ORDER BY id ASC")
+    fun getPreferencesForAddiction(addictionId: Long): Flow<List<NotificationPreferenceEntity>>
+
     @Query("SELECT * FROM notification_preferences WHERE type = :type LIMIT 1")
     suspend fun getByType(type: String): NotificationPreferenceEntity?
 

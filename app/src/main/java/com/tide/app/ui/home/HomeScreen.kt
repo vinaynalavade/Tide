@@ -12,31 +12,35 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.LocalAtm
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Spa
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Warning
-import kotlin.math.max
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,7 +49,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,6 +62,10 @@ import com.tide.app.core.theme.TidePrimaryLuminous
 import com.tide.app.core.theme.TideSlip
 import com.tide.app.core.theme.TideSuccess
 import com.tide.app.core.theme.TideTheme
+import com.tide.app.data.local.entity.AddictionEntity
+import com.tide.app.ui.habits.AddEditHabitBottomSheet
+import com.tide.app.ui.habits.ArchivedHabitsBottomSheet
+import com.tide.app.ui.habits.ManageHabitsBottomSheet
 import com.tide.app.ui.tracking.DailyCheckInBottomSheet
 import com.tide.app.ui.tracking.LogConsumptionBottomSheet
 import com.tide.app.ui.tracking.LogCravingBottomSheet
@@ -68,6 +75,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.max
 
 @Composable
 fun HomeScreen(
@@ -78,9 +86,15 @@ fun HomeScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
-    var showConsumptionSheet by remember { mutableStateOf(false) }
-    var showCravingSheet by remember { mutableStateOf(false) }
-    var showSlipSheet by remember { mutableStateOf(false) }
+    var showAddHabitSheet by remember { mutableStateOf(false) }
+    var habitToEdit by remember { mutableStateOf<HabitCardData?>(null) }
+    var showManageHabitsSheet by remember { mutableStateOf(false) }
+    var showArchivedSheet by remember { mutableStateOf(false) }
+
+    // Habit-specific logging sheets
+    var loggingConsumptionHabit by remember { mutableStateOf<HabitCardData?>(null) }
+    var loggingCravingHabit by remember { mutableStateOf<HabitCardData?>(null) }
+    var loggingSlipHabit by remember { mutableStateOf<HabitCardData?>(null) }
     var showCheckInSheet by remember { mutableStateOf(false) }
 
     if (state.isLoading) {
@@ -89,8 +103,6 @@ fun HomeScreen(
         }
         return
     }
-
-    val addiction = state.addiction ?: return
 
     val currentHour = LocalTime.now().hour
     val greeting = when {
@@ -105,183 +117,150 @@ fun HomeScreen(
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
-            .padding(top = 16.dp, bottom = 100.dp)
+            .padding(top = 16.dp, bottom = 110.dp)
     ) {
-        // Editorial Greeting
-        Text(
-            text = greeting,
-            style = MaterialTheme.typography.labelLarge,
-            color = TideTheme.colors.textSecondary
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = "Stay with the tide.",
-            style = MaterialTheme.typography.headlineLarge,
-            color = TideTheme.colors.textPrimary
-        )
+        // Editorial Greeting & Add Habit Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TideTheme.colors.textSecondary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Stay with the tide.",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = TideTheme.colors.textPrimary
+                )
+            }
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = TidePrimary.copy(alpha = 0.15f),
+                border = BorderStroke(1.dp, TidePrimaryLuminous.copy(alpha = 0.4f)),
+                modifier = Modifier.clickable { showAddHabitSheet = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Habit", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = TidePrimaryLuminous)
+                }
+            }
+        }
 
-        // Adaptive Hero Goal Card
-        AdaptiveHeroCard(
-            goalType = addiction.goalType,
-            addictionName = addiction.name,
-            unit = addiction.unit,
-            streakDays = state.streak.currentStreak,
-            todayCount = state.todayConsumptionCount,
-            targetAmount = state.goal?.targetAmount ?: 0.0,
-            elapsedDays = state.streak.totalElapsedDays
-        )
+        // UNDO BANNER (Section 18)
+        state.undoState?.let { undo ->
+            Spacer(modifier = Modifier.height(14.dp))
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = TideTheme.colors.cardBackground,
+                border = BorderStroke(1.dp, TidePrimaryLuminous.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Undo, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(undo.message, style = MaterialTheme.typography.bodySmall, color = TideTheme.colors.textPrimary)
+                    }
 
-        Spacer(modifier = Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "UNDO",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TidePrimaryLuminous,
+                            modifier = Modifier
+                                .clickable { viewModel.undoLastAction() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                        IconButton(onClick = { viewModel.dismissUndo() }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = TideTheme.colors.textSecondary, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(18.dp))
 
         // Craving Mode Banner Button
         TideCravingBannerButton(onClick = onNavigateToCravingMode)
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 2x2 Key Metric Cards - Goal-Adaptive
-        when (addiction.goalType.uppercase()) {
-            "QUIT" -> {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricCard(
-                        title = "Money Saved",
-                        value = "₹${state.money.lifetimeSaved.toInt()}",
-                        subtitle = "₹${state.money.todaySaved.toInt()} today",
-                        icon = Icons.Default.LocalAtm,
-                        accentColor = TideSuccess,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCard(
-                        title = "Avoided",
-                        value = "${state.avoided.lifetimeAvoided.toInt()}",
-                        subtitle = "${state.avoided.todayAvoided.toInt()} today (${addiction.unit})",
-                        icon = Icons.Default.Shield,
-                        accentColor = TidePrimaryLuminous,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+        // SECTION: TODAY'S HABITS
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Today's Habits",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = TideTheme.colors.textPrimary
+            )
+            Text(
+                text = "Manage (${state.activeHabits.size}) →",
+                style = MaterialTheme.typography.labelSmall,
+                color = TidePrimaryLuminous,
+                modifier = Modifier.clickable { showManageHabitsSheet = true }
+            )
+        }
 
-                Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+        if (state.activeHabits.isEmpty()) {
+            TideCard(
+                onClick = { showAddHabitSheet = true }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    MetricCard(
-                        title = "Current Streak",
-                        value = "${state.streak.currentStreak} d",
-                        subtitle = "Best: ${state.streak.longestStreak} days",
-                        icon = Icons.AutoMirrored.Filled.TrendingUp,
-                        accentColor = TidePrimaryLuminous,
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        text = "No active habits tracked yet",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = TideTheme.colors.textPrimary
                     )
-                    MetricCard(
-                        title = "Clean Days",
-                        value = "${state.streak.totalCleanDays}",
-                        subtitle = "${state.streak.successRate}% rate",
-                        icon = Icons.Default.Spa,
-                        accentColor = TideTheme.colors.warning,
-                        modifier = Modifier.weight(1f)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Tap to add your first habit (Smoking, Sugar, Social Media, etc.)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TideTheme.colors.textSecondary
                     )
                 }
             }
-            "REDUCE" -> {
-                val target = state.goal?.targetAmount ?: 0.0
-                val remainingAllowance = max(0.0, target - state.todayConsumptionCount)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricCard(
-                        title = "Money Saved",
-                        value = "₹${state.money.lifetimeSaved.toInt()}",
-                        subtitle = "₹${state.money.todaySaved.toInt()} today",
-                        icon = Icons.Default.LocalAtm,
-                        accentColor = TideSuccess,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCard(
-                        title = "Allowance Left",
-                        value = "${remainingAllowance.toInt()} ${addiction.unit}",
-                        subtitle = "Target: ${target.toInt()} / day",
-                        icon = Icons.Default.Shield,
-                        accentColor = if (remainingAllowance > 0) TidePrimaryLuminous else TideSlip,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricCard(
-                        title = "Target Streak",
-                        value = "${state.streak.currentStreak} d",
-                        subtitle = "Best: ${state.streak.longestStreak} d on target",
-                        icon = Icons.AutoMirrored.Filled.TrendingUp,
-                        accentColor = TidePrimaryLuminous,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCard(
-                        title = "Days on Target",
-                        value = "${state.streak.totalCleanDays}",
-                        subtitle = "${state.streak.successRate}% within target",
-                        icon = Icons.Default.DoneAll,
-                        accentColor = TideTheme.colors.warning,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            else -> { // "TRACK"
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricCard(
-                        title = "Money Spent",
-                        value = "₹${state.money.lifetimeSpent.toInt()}",
-                        subtitle = "₹${state.money.todaySpent.toInt()} today",
-                        icon = Icons.Default.LocalAtm,
-                        accentColor = TidePrimaryLuminous,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCard(
-                        title = "Logged Today",
-                        value = "${state.todayConsumptionCount.toInt()} ${addiction.unit}",
-                        subtitle = "Baseline: ${addiction.baselineAmount.toInt()} ${addiction.unit}",
-                        icon = Icons.Default.Equalizer,
-                        accentColor = TidePrimaryLuminous,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    MetricCard(
-                        title = "Days Tracked",
-                        value = "${state.streak.totalElapsedDays} d",
-                        subtitle = "Active observation",
-                        icon = Icons.AutoMirrored.Filled.TrendingUp,
-                        accentColor = TidePrimaryLuminous,
-                        modifier = Modifier.weight(1f)
-                    )
-                    MetricCard(
-                        title = "Today's Logs",
-                        value = "${state.todayEvents.size}",
-                        subtitle = if (state.todayCheckIn != null) "Checked in today" else "No check-in yet",
-                        icon = Icons.Default.Spa,
-                        accentColor = TideTheme.colors.warning,
-                        modifier = Modifier.weight(1f)
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                state.activeHabits.forEach { cardData ->
+                    HabitCard(
+                        data = cardData,
+                        onQuickLogOne = { viewModel.logConsumption(cardData.habit.id, 1.0, null, null) },
+                        onLogCustom = { loggingConsumptionHabit = cardData },
+                        onLogCraving = { loggingCravingHabit = cardData },
+                        onLogSlip = { loggingSlipHabit = cardData },
+                        onEdit = { habitToEdit = cardData }
                     )
                 }
             }
@@ -301,6 +280,7 @@ fun HomeScreen(
         Text(
             text = "Today's Activity",
             style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
             color = TideTheme.colors.textPrimary
         )
         Spacer(modifier = Modifier.height(10.dp))
@@ -326,11 +306,7 @@ fun HomeScreen(
                             color = TideTheme.colors.textPrimary
                         )
                         Text(
-                            text = when (addiction.goalType.uppercase()) {
-                                "QUIT" -> "No consumption or slips recorded today."
-                                "REDUCE" -> "Within target. No logs recorded yet today."
-                                else -> "No activity recorded yet today. Tap + to log."
-                            },
+                            text = "No events recorded yet today. Use the cards above or widget for quick actions.",
                             style = MaterialTheme.typography.bodySmall,
                             color = TideTheme.colors.textSecondary
                         )
@@ -346,126 +322,376 @@ fun HomeScreen(
         }
     }
 
-    // Modal Action Sheets
+    // BOTTOM SHEETS & MODALS
+
+    // Quick Log Sheet from Bottom Nav
     if (showQuickLogSheet) {
+        val targetHabit = state.activeHabits.firstOrNull()
         QuickLogBottomSheet(
             onDismiss = onDismissQuickLogSheet,
-            onSelectConsumption = { showConsumptionSheet = true },
-            onSelectCraving = { showCravingSheet = true },
-            onSelectSlip = { showSlipSheet = true },
+            onSelectConsumption = { loggingConsumptionHabit = targetHabit },
+            onSelectCraving = { loggingCravingHabit = targetHabit },
+            onSelectSlip = { loggingSlipHabit = targetHabit },
             onSelectCheckIn = { showCheckInSheet = true }
         )
     }
 
-    if (showConsumptionSheet) {
-        LogConsumptionBottomSheet(
-            unit = addiction.unit,
-            triggers = state.triggers,
-            onDismiss = { showConsumptionSheet = false },
-            onSave = { amount, triggerId, note ->
-                viewModel.logConsumption(amount, triggerId, note)
+    // Add New Habit Sheet
+    if (showAddHabitSheet) {
+        AddEditHabitBottomSheet(
+            onDismiss = { showAddHabitSheet = false },
+            onSaveHabit = { habit, product, goal ->
+                viewModel.createHabit(habit, product, goal)
             }
         )
     }
 
-    if (showCravingSheet) {
+    // Edit Existing Habit Sheet
+    habitToEdit?.let { card ->
+        AddEditHabitBottomSheet(
+            habitToEdit = card.habit,
+            existingProduct = card.product,
+            existingGoal = card.goal,
+            onDismiss = { habitToEdit = null },
+            onSaveHabit = { habit, product, goal ->
+                viewModel.updateHabit(habit, product, goal)
+                habitToEdit = null
+            }
+        )
+    }
+
+    // Manage Habits Sheet
+    if (showManageHabitsSheet) {
+        ManageHabitsBottomSheet(
+            activeHabits = state.activeHabits.map { it.habit },
+            onDismiss = { showManageHabitsSheet = false },
+            onAddNewHabit = {
+                showManageHabitsSheet = false
+                showAddHabitSheet = true
+            },
+            onEditHabit = { habit ->
+                showManageHabitsSheet = false
+                habitToEdit = state.activeHabits.find { it.habit.id == habit.id }
+            },
+            onArchiveHabit = { habitId ->
+                viewModel.archiveHabit(habitId)
+            },
+            onDeleteHabit = { habitId ->
+                viewModel.deleteHabit(habitId)
+            },
+            onViewArchived = {
+                showManageHabitsSheet = false
+                showArchivedSheet = true
+            }
+        )
+    }
+
+    // Archived Habits Sheet
+    if (showArchivedSheet) {
+        ArchivedHabitsBottomSheet(
+            archivedHabits = state.archivedHabits,
+            onDismiss = { showArchivedSheet = false },
+            onRestoreHabit = { habitId ->
+                viewModel.restoreHabit(habitId)
+            },
+            onDeleteHabit = { habitId ->
+                viewModel.deleteHabit(habitId)
+            }
+        )
+    }
+
+    // Custom Consumption Sheet
+    loggingConsumptionHabit?.let { card ->
+        LogConsumptionBottomSheet(
+            unit = card.habit.unit,
+            triggers = state.triggers,
+            onDismiss = { loggingConsumptionHabit = null },
+            onSave = { amount, triggerId, note ->
+                viewModel.logConsumption(card.habit.id, amount, triggerId, note)
+                loggingConsumptionHabit = null
+            }
+        )
+    }
+
+    // Craving Sheet
+    loggingCravingHabit?.let { card ->
         LogCravingBottomSheet(
             triggers = state.triggers,
-            onDismiss = { showCravingSheet = false },
+            onDismiss = { loggingCravingHabit = null },
             onSave = { intensity, triggerId, mood, resisted, note ->
-                viewModel.logCraving(intensity, triggerId, mood, resisted, note)
+                viewModel.logCraving(card.habit.id, intensity, triggerId, mood, resisted, note)
+                loggingCravingHabit = null
             }
         )
     }
 
-    if (showSlipSheet) {
+    // Slip Sheet
+    loggingSlipHabit?.let { card ->
         LogSlipBottomSheet(
-            unit = addiction.unit,
+            unit = card.habit.unit,
             triggers = state.triggers,
-            onDismiss = { showSlipSheet = false },
+            onDismiss = { loggingSlipHabit = null },
             onSave = { amount, triggerId, mood, note ->
-                viewModel.logSlip(amount, triggerId, mood, note)
+                viewModel.logSlip(card.habit.id, amount, triggerId, mood, note)
+                loggingSlipHabit = null
             }
         )
     }
 
+    // Daily Check-in Sheet
     if (showCheckInSheet) {
         DailyCheckInBottomSheet(
             onDismiss = { showCheckInSheet = false },
             onSave = { mood, hadCravings, intensity, note ->
                 viewModel.saveCheckIn(mood, hadCravings, intensity, note)
+                showCheckInSheet = false
             }
         )
     }
 }
 
 @Composable
-private fun AdaptiveHeroCard(
-    goalType: String,
-    addictionName: String,
-    unit: String,
-    streakDays: Int,
-    todayCount: Double,
-    targetAmount: Double,
-    elapsedDays: Int
+private fun HabitCard(
+    data: HabitCardData,
+    onQuickLogOne: () -> Unit,
+    onLogCustom: () -> Unit,
+    onLogCraving: () -> Unit,
+    onLogSlip: () -> Unit,
+    onEdit: () -> Unit
 ) {
-    TideGlassCard(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    val habit = data.habit
+    val goalColor = when (habit.goalType.uppercase()) {
+        "QUIT" -> TideSlip
+        "REDUCE" -> TideSuccess
+        else -> TidePrimaryLuminous
+    }
+
+    TideGlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(14.dp)
         ) {
-            when (goalType.uppercase()) {
-                "QUIT" -> {
+            // Header: Title, Category, Goal badge, Edit
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "$streakDays ${if (streakDays == 1) "day" else "days"}",
-                        style = MaterialTheme.typography.displayLarge.copy(
+                        text = habit.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TideTheme.colors.textPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = goalColor.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = habit.goalType,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = (-1).sp
-                        ),
-                        color = TidePrimaryLuminous
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "since your last $addictionName",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TideTheme.colors.textSecondary
-                    )
+                            color = goalColor,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
                 }
+
+                IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit habit", tint = TideTheme.colors.textSecondary, modifier = Modifier.size(16.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Main Contextual Progress Row
+            when (habit.goalType.uppercase()) {
                 "REDUCE" -> {
-                    Text(
-                        text = "${todayCount.toInt()} / ${targetAmount.toInt()}",
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-1).sp
-                        ),
-                        color = if (todayCount <= targetAmount) TideSuccess else TideSlip
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Today's target ($unit)",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TideTheme.colors.textSecondary
-                    )
+                    val target = data.goal?.targetAmount ?: 0.0
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Column {
+                            Text(
+                                text = "${data.todayConsumptionCount.toInt()} / ${target.toInt()} ${habit.unit}",
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = if (data.isCleanToday) TideSuccess else TideSlip
+                            )
+                            Text(
+                                text = "Today's target (${data.remainingAllowance.toInt()} remaining)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TideTheme.colors.textSecondary
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${data.streak.currentStreak} d",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TidePrimaryLuminous
+                            )
+                            Text(
+                                text = "Target streak",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TideTheme.colors.textSecondary
+                            )
+                        }
+                    }
                 }
-                else -> {
-                    Text(
-                        text = "Day $elapsedDays",
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-1).sp
-                        ),
-                        color = TidePrimaryLuminous
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Understanding your pattern",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TideTheme.colors.textSecondary
-                    )
+                "QUIT" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Column {
+                            Text(
+                                text = "${data.streak.currentStreak} ${if (data.streak.currentStreak == 1) "day" else "days"}",
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = TidePrimaryLuminous
+                            )
+                            Text(
+                                text = "Clean since start • Best: ${data.streak.longestStreak} d",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TideTheme.colors.textSecondary
+                            )
+                        }
+
+                        if (habit.hasFinancialImpact) {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "₹${data.money.lifetimeSaved.toInt()}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TideSuccess
+                                )
+                                Text(
+                                    text = "Money saved",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TideTheme.colors.textSecondary
+                                )
+                            }
+                        } else {
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "${data.avoided.lifetimeAvoided.toInt()}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TidePrimaryLuminous
+                                )
+                                Text(
+                                    text = "${habit.unit} avoided",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TideTheme.colors.textSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+                else -> { // TRACK
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        Column {
+                            Text(
+                                text = "${data.todayConsumptionCount.toInt()} ${habit.unit}",
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                                color = TidePrimaryLuminous
+                            )
+                            Text(
+                                text = "Baseline: ${habit.baselineAmount.toInt()} / ${habit.baselineFrequency}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TideTheme.colors.textSecondary
+                            )
+                        }
+
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "${data.streak.totalElapsedDays} d",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TidePrimaryLuminous
+                            )
+                            Text(
+                                text = "Active observation",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TideTheme.colors.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Buttons Row: [+1 Log] [Craving] [Slip]
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = TidePrimary.copy(alpha = 0.2f),
+                    border = BorderStroke(1.dp, TidePrimaryLuminous.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onQuickLogOne() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 9.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = TidePrimaryLuminous, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("+1 Log", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TidePrimaryLuminous)
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = TideTheme.colors.cardBorder.copy(alpha = 0.2f),
+                    border = BorderStroke(1.dp, TideTheme.colors.cardBorder),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onLogCraving() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 9.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Air, contentDescription = null, tint = TideTheme.colors.warning, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Craving", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TideTheme.colors.textPrimary)
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = TideTheme.colors.cardBorder.copy(alpha = 0.2f),
+                    border = BorderStroke(1.dp, TideTheme.colors.cardBorder),
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onLogSlip() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 9.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Outlined.Warning, contentDescription = null, tint = TideSlip, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Slip", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = TideSlip)
+                    }
                 }
             }
         }
@@ -477,9 +703,7 @@ private fun DailyCheckInCard(
     checkIn: com.tide.app.data.local.entity.DailyCheckInEntity?,
     onCheckInClick: () -> Unit
 ) {
-    TideCard(
-        onClick = onCheckInClick
-    ) {
+    TideCard(onClick = onCheckInClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

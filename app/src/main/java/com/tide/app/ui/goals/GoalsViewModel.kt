@@ -23,13 +23,17 @@ import java.time.LocalDate
 
 data class GoalsUiState(
     val isLoading: Boolean = true,
-    val addiction: AddictionEntity? = null,
+    val activeHabits: List<AddictionEntity> = emptyList(),
+    val selectedHabit: AddictionEntity? = null,
     val activeGoal: GoalEntity? = null,
     val streak: StreakResult = StreakResult(0, 0, 0, 0, 0.0),
     val money: MoneyResult = MoneyResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
     val milestones: List<MilestoneEntity> = emptyList(),
     val recoveryGoals: List<RecoveryGoalEntity> = emptyList()
-)
+) {
+    // Backward-compatibility alias
+    val addiction: AddictionEntity? get() = selectedHabit
+}
 
 class GoalsViewModel(
     private val repository: TideRepository
@@ -38,30 +42,35 @@ class GoalsViewModel(
     private val _uiState = MutableStateFlow(GoalsUiState())
     val uiState: StateFlow<GoalsUiState> = _uiState.asStateFlow()
 
+    private var selectedHabitIdOverride: Long? = null
+
     init {
         loadGoalsData()
     }
 
     private fun loadGoalsData() {
         viewModelScope.launch {
-            repository.getActiveAddiction().collect { addiction ->
-                if (addiction == null) {
+            repository.getActiveHabits().collect { activeHabits ->
+                if (activeHabits.isEmpty()) {
                     _uiState.value = GoalsUiState(isLoading = false)
                     return@collect
                 }
 
+                val habit = activeHabits.find { it.id == selectedHabitIdOverride }
+                    ?: activeHabits.first()
+
                 combine(
-                    repository.getActiveGoal(addiction.id),
+                    repository.getActiveGoal(habit.id),
                     combine(
-                        repository.getMilestones(),
+                        repository.getMilestonesForHabit(habit.id),
                         repository.getRecoveryGoals()
                     ) { m, r -> Pair(m, r) },
-                    repository.getConsumptionEntries(addiction.id),
-                    repository.getCravingEntries(addiction.id),
-                    repository.getSlipEntries(addiction.id)
+                    repository.getConsumptionEntries(habit.id),
+                    repository.getCravingEntries(habit.id),
+                    repository.getSlipEntries(habit.id)
                 ) { goal, (milestones, recoveryGoals), consumptions, cravings, slips ->
                     val today = LocalDate.now()
-                    val startDate = TideCalculationEngine.epochMillisToLocalDate(addiction.startDate)
+                    val startDate = TideCalculationEngine.epochMillisToLocalDate(habit.startDate)
                     val effectiveStart = if (startDate.isAfter(today)) today else startDate
 
                     val consumptionRaw = consumptions.map {
@@ -77,7 +86,7 @@ class GoalsViewModel(
                     val summaries = TideCalculationEngine.buildDailySummaries(
                         startDate = effectiveStart,
                         endDate = today,
-                        goalType = addiction.goalType,
+                        goalType = habit.goalType,
                         targetAmount = goal?.targetAmount ?: 0.0,
                         consumptionEntries = consumptionRaw,
                         slipEntries = slipRaw,
@@ -85,11 +94,18 @@ class GoalsViewModel(
                     )
 
                     val streak = TideCalculationEngine.calculateStreaks(summaries, today)
-                    val money = TideCalculationEngine.calculateMoney(summaries, addiction.baselineCost, today)
+                    val money = TideCalculationEngine.calculateMoney(
+                        summaries,
+                        habit.baselineCost,
+                        today,
+                        hasFinancialImpact = habit.hasFinancialImpact,
+                        goalType = habit.goalType
+                    )
 
                     GoalsUiState(
                         isLoading = false,
-                        addiction = addiction,
+                        activeHabits = activeHabits,
+                        selectedHabit = habit,
                         activeGoal = goal,
                         streak = streak,
                         money = money,
@@ -100,6 +116,27 @@ class GoalsViewModel(
                     _uiState.value = state
                 }
             }
+        }
+    }
+
+    fun selectHabit(habitId: Long) {
+        selectedHabitIdOverride = habitId
+        loadGoalsData()
+    }
+
+    fun changeGoal(habitId: Long, newGoalType: String, newTargetAmount: Double) {
+        viewModelScope.launch {
+            val habit = repository.getHabitByIdSync(habitId) ?: return@launch
+            val updatedHabit = habit.copy(goalType = newGoalType.uppercase())
+            val existingGoal = repository.getActiveGoal(habitId) // Flow
+            val goal = GoalEntity(
+                addictionId = habitId,
+                type = newGoalType.uppercase(),
+                targetAmount = if (newGoalType.uppercase() == "REDUCE") newTargetAmount else 0.0,
+                targetFrequency = "day",
+                active = true
+            )
+            repository.updateHabitConfig(updatedHabit, null, goal)
         }
     }
 

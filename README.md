@@ -10,7 +10,7 @@
 [![Room Database](https://img.shields.io/badge/Storage-Room%202.6.1-F4B400?logo=sqlite&logoColor=white)](https://developer.android.com/training/data-storage/room)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-35%20(Android%2015)-black)](https://developer.android.com/about/versions/15)
 [![Min SDK](https://img.shields.io/badge/Min%20SDK-26%20(Android%208.0)-black)](https://developer.android.com)
-[![Version](https://img.shields.io/badge/Release-v1.0.0%20Build%201-008080)](https://github.com/vinaynalavade/Tide/releases/tag/v1.0.0-build1)
+[![Version](https://img.shields.io/badge/Release-v1.1.0%20Build%202-008080)](https://github.com/vinaynalavade/Tide/releases)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
@@ -426,7 +426,7 @@ Tide integrates the official Google Play In-App Updates SDK ([`com.google.androi
 
 ## Roadmap
 
-- [x] **v1.0.0 Build 1 (Current)**
+- [x] **v1.0.0 Build 1 (Baseline)**
   - [x] Multi-category addiction-agnostic tracking (Smoking, Alcohol, Vaping, Gaming, Sugar, etc.)
   - [x] Goal-Adaptive Semantics (Quit, Reduce, Track modes)
   - [x] Signature Craving Mode with 4-4-4-2 Tidal Breathing Wave
@@ -437,12 +437,20 @@ Tide integrates the official Google Play In-App Updates SDK ([`com.google.androi
   - [x] Full JSON data export and atomic database wipe
   - [x] Google Play In-App Updates integration
   - [x] Google Play upload key signing configuration
-- [ ] **v1.1.0 (Planned)**
+- [x] **v1.1.0 Build 2 (Current Release)**
+  - [x] **Universal Multi-Habit Tracking**: Track multiple addictive habits concurrently (Smoking, Sugar, Alcohol, Caffeine, Social Media, Gaming, Custom, etc.)
+  - [x] **Android Home-Screen Quick Action Widget**: Quick consumption logging, craving capture, habit cycling, and undo without opening the app
+  - [x] **Transaction-Safe Undo Engine**: Reverse accidental logs instantly from both app dashboard and home-screen widget
+  - [x] **Habit Lifecycle Management**: Add new habits, edit configurations (units, baselines, prices, targets), archive habits, restore archived habits
+  - [x] **Universal Impact & Non-Financial Logic**: Habits like Sugar, Gaming, and Social Media have zero-money guarantees (`hasFinancialImpact = false`)
+  - [x] **Non-Destructive Goal Transitions**: Switch between TRACK, REDUCE, and QUIT without deleting historical streaks or records
+  - [x] **Automated Room Migration (v1 -> v2)**: Preserves existing v1.0.0 data while migrating to multi-habit schema
+  - [x] **Expanded Settings & Account Architecture**: Manage habits, archived habits, tracking preferences, and local-first private profile
+- [ ] **v1.2.0 (Planned)**
   - [ ] Hardware Biometric App Lock (`androidx.biometric`)
-  - [ ] Multi-addiction concurrent tracking profiles
-  - [ ] Home Screen Widgets (Glance / Compose)
   - [ ] Wear OS standalone craving companion
   - [ ] Encrypted database option (SQLCipher)
+  - [ ] Optional end-to-end encrypted cloud backup sync
 
 ---
 
